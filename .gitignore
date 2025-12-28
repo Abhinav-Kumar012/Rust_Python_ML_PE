@@ -1,1 +1,12 @@
+# misc
+.vscode/
+.idea/
+
+# python
 **/.venv/
+**/__pycache__/
+
+# rust
+**/Cargo.lock
+rust_ml/target/
+**/*.rs.bk

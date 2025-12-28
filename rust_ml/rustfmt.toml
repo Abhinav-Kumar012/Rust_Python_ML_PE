@@ -1,0 +1,9 @@
+edition = "2024"
+newline_style = "Unix"
+fn_params_layout = "Vertical"
+hard_tabs = true
+merge_derives = true
+remove_nested_parens = true
+reorder_imports = true
+reorder_modules = true
+tab_spaces = 4
