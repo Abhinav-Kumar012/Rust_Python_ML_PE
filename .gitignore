@@ -1,6 +1,6 @@
 # misc
-.vscode/
-.idea/
+**/.vscode/
+**/.idea/
 
 # python
 **/.venv/
