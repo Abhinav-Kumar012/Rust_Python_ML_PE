@@ -2,4 +2,8 @@
 resolver = "3"
 members = []
 
-[dependencies]
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+
+[workspace.dependencies]
