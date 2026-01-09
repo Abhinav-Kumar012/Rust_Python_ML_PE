@@ -13,7 +13,7 @@ fn main() {
 	type MyAutodiffBackend = Autodiff<MyBackend>;
 
 	let device = burn::backend::wgpu::WgpuDevice::default();
-	let artifact_dir = "/tmp/guide";
+	let artifact_dir = "../model/mnist_rust";
 	crate::training::train::<MyAutodiffBackend>(
 		artifact_dir,
 		TrainingConfig::new(ModelConfig::new(10, 512), AdamConfig::new()),

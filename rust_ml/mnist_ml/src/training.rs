@@ -12,7 +12,10 @@ use burn::{
 	tensor::backend::AutodiffBackend,
 	train::{
 		ClassificationOutput, LearnerBuilder, LearningStrategy, TrainOutput, TrainStep, ValidStep,
-		metric::{AccuracyMetric, LossMetric},
+		metric::{
+			AccuracyMetric, ClassReduction, CpuMemory, CpuTemperature, CpuUse, FBetaScoreMetric,
+			LossMetric, PrecisionMetric, RecallMetric, TopKAccuracyMetric,
+		},
 	},
 };
 impl<B: Backend> Model<B> {
@@ -96,12 +99,30 @@ pub fn train<B: AutodiffBackend>(
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
 		.build(MnistDataset::test());
+	let f1metric = FBetaScoreMetric::multiclass(1.0, 1, ClassReduction::Macro);
+	let precissionmetric = PrecisionMetric::multiclass(1, ClassReduction::Macro);
+	let recallmetric = RecallMetric::multiclass(1, ClassReduction::Macro);
 
 	let learner = LearnerBuilder::new(artifact_dir)
 		.metric_train_numeric(AccuracyMetric::new())
 		.metric_valid_numeric(AccuracyMetric::new())
 		.metric_train_numeric(LossMetric::new())
 		.metric_valid_numeric(LossMetric::new())
+		.metric_train_numeric(precissionmetric.clone())
+		.metric_valid_numeric(precissionmetric.clone())
+		.metric_train_numeric(recallmetric.clone())
+		.metric_valid_numeric(recallmetric.clone())
+		.metric_train_numeric(f1metric.clone()) // F1 score
+		.metric_valid_numeric(f1metric.clone())
+		.metric_train_numeric(TopKAccuracyMetric::new(5))
+		.metric_valid_numeric(TopKAccuracyMetric::new(5))
+		// system / hardware
+		.metric_train_numeric(CpuUse::new())
+		.metric_valid_numeric(CpuUse::new())
+		.metric_train_numeric(CpuTemperature::new())
+		.metric_valid_numeric(CpuTemperature::new())
+		.metric_train_numeric(CpuMemory::new())
+		.metric_valid_numeric(CpuMemory::new())
 		.with_file_checkpointer(CompactRecorder::new())
 		.learning_strategy(LearningStrategy::SingleDevice(device.clone()))
 		.num_epochs(config.num_epochs)
