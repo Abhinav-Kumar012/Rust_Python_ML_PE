@@ -1,0 +1,5 @@
+tensorflow>=2.13
+transformers>=4.38
+numpy
+tqdm
+
