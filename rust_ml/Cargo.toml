@@ -6,4 +6,7 @@ members = ["mnist_ml"]
 all = "warn"
 pedantic = "warn"
 
+[workspace.metadata.bacon]
+analyzer = "standard"
+
 [workspace.dependencies]
