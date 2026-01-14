@@ -13,3 +13,6 @@ rust_ml/target/
 
 # model
 model/
+
+# mac files
+**/.DS_Store
