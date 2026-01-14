@@ -1,0 +1,7 @@
+fastapi==0.110.0
+uvicorn==0.29.0
+onnxruntime==1.17.3
+numpy==1.26.4
+psutil==5.9.8
+torchvision==0.17.1
+torch==2.2.1
