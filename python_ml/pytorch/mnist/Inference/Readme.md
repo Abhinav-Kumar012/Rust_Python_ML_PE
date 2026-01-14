@@ -1,10 +1,4 @@
-Below is a **conference-ready `README.md`** that clearly explains **how to build, run, collect metrics, and log results** for the Python ONNX MNIST inference service.
 
-It is written to be **unambiguous, reproducible, and reviewer-safe**.
-
----
-
-```md
 # MNIST ONNX Inference – Python (System-Level Evaluation)
 
 This directory contains a **production-style Python inference service** for MNIST,
@@ -13,23 +7,6 @@ as part of a Rust vs Python ML comparison.
 
 The service performs **inference only** using a **pretrained ONNX model** and
 collects runtime metrics suitable for reporting in a research paper.
-
----
-
-## Directory Structure
-
-```
-
-python_infer/
-├── Dockerfile
-├── app.py
-├── requirements.txt
-├── model.onnx
-└── README.md
-
-````
-
----
 
 ## Prerequisites
 
