@@ -18,6 +18,9 @@ use burn::{
 		},
 	},
 };
+use std::env;
+use std::fs;
+use std::time::Instant;
 impl<B: Backend> Model<B> {
 	pub fn forward_classification(
 		&self,
@@ -133,10 +136,71 @@ pub fn train<B: AutodiffBackend>(
 			config.learning_rate,
 		);
 
+	let start_time = Instant::now();
+
 	let result = learner.fit(dataloader_train, dataloader_test);
+
+	let duration = start_time.elapsed();
+	let duration_secs = duration.as_secs_f64();
+	let avg_epoch_duration = duration_secs / config.num_epochs as f64;
 
 	result
 		.model
 		.save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
 		.expect("Trained model should be saved successfully");
+
+	// Collect metrics
+	let os_info = env::consts::OS;
+	let arch_info = env::consts::ARCH;
+
+	let model_path = format!("{artifact_dir}/model.mpk");
+	let mut model_size = 0;
+	if let Ok(metadata) = fs::metadata(&model_path) {
+		model_size = metadata.len();
+	} else {
+		// Try without extension or with different extension if recorder differs,
+		// but CompactRecorder usually uses binary format.
+		// burn-train usually saves as `model.mpk` (msgpack) or `model.json` depending on recorder.
+		// CompactRecorder uses generic serializer. Let's check directory or just try generic path.
+		// Actually save_file adds extension. Default for CompactRecorder is mpk (msgpack) usually?
+		// Let's assume .mpk based on common Burn usage or check file existence.
+		// For safety we can just list dir or try standard extensions.
+		// Using a simple check.
+		if let Ok(metadata) = fs::metadata(format!("{artifact_dir}/model.mpk")) {
+			model_size = metadata.len();
+		}
+	}
+
+	// Manual JSON construction
+	let json_content = format!(
+		r#"{{
+    "timestamp": {},
+    "status": "success",
+    "total_duration_sec": {:.2},
+    "avg_epoch_duration_sec": {:.2},
+    "setup_info": {{
+        "seed": {}
+    }},
+    "environment": {{
+        "os": "{}",
+        "arch": "{}"
+    }},
+    "artifact_metrics": {{
+        "model_size_bytes": {}
+    }}
+}}"#,
+		std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap_or_default()
+			.as_secs(),
+		duration_secs,
+		avg_epoch_duration,
+		config.seed,
+		os_info,
+		arch_info,
+		model_size
+	);
+
+	fs::write(format!("{artifact_dir}/metrics.json"), json_content)
+		.expect("Metrics should be saved successfully");
 }

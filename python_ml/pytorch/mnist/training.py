@@ -2,6 +2,11 @@
 # Exact translation of training.rs
 
 import os
+import json
+import time
+import platform
+import sys
+import subprocess
 import math
 import random
 import torch
@@ -71,10 +76,31 @@ def build_dataset(base, idents, train=True):
 def run(device):
     os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
-    torch.manual_seed(42)
-    random.seed(42)
+    metrics = {
+        "timestamp": time.time(),
+        "status": "pending",
+        "error_message": None,
+        "total_duration": 0,
+        "epoch_metrics": [],
+        "environment": {
+            "platform": platform.platform(),
+            "python_version": sys.version,
+            "torch_version": torch.__version__,
+            "cpu_info": platform.processor(),
+        },
+        "reproducibility": {
+            "seed": 42
+        },
+        "artifact_size": {}
+    }
 
-    model = Model().to(device)
+    start_time = time.time()
+
+    try:
+        torch.manual_seed(42)
+        random.seed(42)
+
+        model = Model().to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=1.0,
@@ -126,6 +152,7 @@ def run(device):
     step = 0
 
     for epoch in range(20):
+        epoch_start_time = time.time()
         model.train()
         for images, targets in train_loader:
             images, targets = images.to(device), targets.to(device)
@@ -158,7 +185,20 @@ def run(device):
         val_loss /= len(valid_loader)
         acc = correct / total
 
-        print(f"Epoch {epoch}: val_loss={val_loss:.4f}, acc={acc:.4f}")
+        val_loss /= len(valid_loader)
+        acc = correct / total
+        epoch_end_time = time.time()
+        epoch_duration = epoch_end_time - epoch_start_time
+
+        print(f"Epoch {epoch}: val_loss={val_loss:.4f}, acc={acc:.4f}, time={epoch_duration:.2f}s")
+        
+        metrics["epoch_metrics"].append({
+            "epoch": epoch,
+            "time": epoch_duration,
+            "train_loss": 0.0, # Placeholder as we aren't tracking running train loss in this loop
+            "val_loss": val_loss,
+            "accuracy": acc
+        })
 
         if val_loss < best_loss:
             best_loss = val_loss
@@ -190,4 +230,28 @@ def run(device):
         dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
     )
     print(f"Model exported to {onnx_path}")
+    
+    metrics["status"] = "success"
+
+    except Exception as e:
+        metrics["status"] = "failure"
+        metrics["error_message"] = str(e)
+        print(f"Training failed: {e}")
+        raise e
+    finally:
+        end_time = time.time()
+        metrics["total_duration"] = end_time - start_time
+        
+        # Get artifact sizes
+        try:
+            if os.path.exists(f"{ARTIFACT_DIR}/model.pt"):
+                metrics["artifact_size"]["model.pt"] = os.path.getsize(f"{ARTIFACT_DIR}/model.pt")
+            if os.path.exists(f"{ARTIFACT_DIR}/model.onnx"):
+                metrics["artifact_size"]["model.onnx"] = os.path.getsize(f"{ARTIFACT_DIR}/model.onnx")
+        except Exception:
+            pass
+
+        with open(f"{ARTIFACT_DIR}/metrics.json", "w") as f:
+            json.dump(metrics, f, indent=4)
+        print(f"Metrics saved to {ARTIFACT_DIR}/metrics.json")
 
