@@ -170,3 +170,24 @@ def run(device):
                 print("Early stopping")
                 break
 
+    # Load best model and export to ONNX
+    print("Loading best model for ONNX export...")
+    model.load_state_dict(torch.load(f"{ARTIFACT_DIR}/model.pt"))
+    model.eval()
+
+    dummy_input = torch.randn(1, 1, 28, 28, device=device)
+    onnx_path = f"{ARTIFACT_DIR}/model.onnx"
+
+    torch.onnx.export(
+        model,
+        dummy_input,
+        onnx_path,
+        export_params=True,
+        opset_version=10,
+        do_constant_folding=True,
+        input_names=['input'],
+        output_names=['output'],
+        dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+    )
+    print(f"Model exported to {onnx_path}")
+
