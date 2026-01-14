@@ -4,7 +4,10 @@ use crate::{
 	model::Model,
 };
 use burn::{
-	data::{dataloader::DataLoaderBuilder, dataset::vision::MnistDataset},
+	data::{
+		dataloader::DataLoaderBuilder, dataset::Dataset, dataset::InMemDataset,
+		dataset::vision::MnistDataset,
+	},
 	nn::loss::CrossEntropyLossConfig,
 	optim::AdamConfig,
 	prelude::*,
@@ -91,17 +94,34 @@ pub fn train<B: AutodiffBackend>(
 
 	let batcher = MnistBatcher::default();
 
+	// Dataset Splitting
+	let dataset = MnistDataset::train();
+	let mut items: Vec<_> = dataset.iter().collect();
+
+	// Shuffle with seed 42
+	let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+	use rand::SeedableRng;
+	use rand::seq::SliceRandom;
+	items.shuffle(&mut rng);
+
+	let total_len = items.len();
+	let train_len = (total_len as f64 * 0.85) as usize;
+	let (train_items, valid_items) = items.split_at(train_len);
+
+	let train_dataset = InMemDataset::new(train_items.to_vec());
+	let valid_dataset = InMemDataset::new(valid_items.to_vec());
+
 	let dataloader_train = DataLoaderBuilder::new(batcher.clone())
 		.batch_size(config.batch_size)
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
-		.build(MnistDataset::train());
+		.build(train_dataset);
 
 	let dataloader_test = DataLoaderBuilder::new(batcher)
 		.batch_size(config.batch_size)
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
-		.build(MnistDataset::test());
+		.build(valid_dataset);
 	let f1metric = FBetaScoreMetric::multiclass(1.0, 1, ClassReduction::Macro);
 	let precissionmetric = PrecisionMetric::multiclass(1, ClassReduction::Macro);
 	let recallmetric = RecallMetric::multiclass(1, ClassReduction::Macro);

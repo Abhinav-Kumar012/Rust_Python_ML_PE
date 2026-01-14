@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 burn = { version = "~0.19", features = ["std", "tui", "train", "vision", "wgpu", "fusion", "metrics"], default-features = false }
+rand = "0.8"
 
 [lints]
 workspace = true

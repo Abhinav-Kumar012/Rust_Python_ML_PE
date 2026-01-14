@@ -121,13 +121,24 @@ def run(device):
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     base_train = MNIST(".", train=True, download=True)
-    train_plain = torch.utils.data.Subset(base_train, range(0, 55_000))
-    valid_plain = torch.utils.data.Subset(base_train, range(55_000, 60_000))
+    
+    # Split 85:15 (60000 -> 51000 train, 9000 val)
+    total_size = len(base_train)
+    train_size = int(0.85 * total_size)
+    val_size = total_size - train_size
+    
+    train_plain, valid_plain = torch.utils.data.random_split(
+        base_train, 
+        [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)
+    )
 
     train_idents = generate_idents(10_000)
+    # Adjust valid_idents to not be too large if necessary, but function takes None for base size
     valid_idents = generate_idents(None)
 
     train_ds = build_dataset(train_plain, train_idents, train=True)
+    # Use valid_plain (randomly split) for validation
     valid_ds = build_dataset(valid_plain, valid_idents, train=False)
 
     train_loader = DataLoader(
