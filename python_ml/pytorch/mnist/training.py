@@ -122,24 +122,26 @@ def run(device):
 
     base_train = MNIST(".", train=True, download=True)
     
-    # Split 85:15 (60000 -> 51000 train, 9000 val)
+    # Split 80:10:10 (60000 -> 48000 train, 6000 val, 6000 test)
     total_size = len(base_train)
-    train_size = int(0.85 * total_size)
-    val_size = total_size - train_size
+    train_size = int(0.8 * total_size)
+    val_size = int(0.1 * total_size)
+    test_size = total_size - train_size - val_size
     
-    train_plain, valid_plain = torch.utils.data.random_split(
+    train_plain, valid_plain, test_plain = torch.utils.data.random_split(
         base_train, 
-        [train_size, val_size],
+        [train_size, val_size, test_size],
         generator=torch.Generator().manual_seed(42)
     )
 
     train_idents = generate_idents(10_000)
-    # Adjust valid_idents to not be too large if necessary, but function takes None for base size
+    # Adjust idents for validation/test if needed
     valid_idents = generate_idents(None)
+    test_idents = generate_idents(None)
 
     train_ds = build_dataset(train_plain, train_idents, train=True)
-    # Use valid_plain (randomly split) for validation
     valid_ds = build_dataset(valid_plain, valid_idents, train=False)
+    test_ds = build_dataset(test_plain, test_idents, train=False)
 
     train_loader = DataLoader(
         train_ds,
@@ -157,6 +159,14 @@ def run(device):
         collate_fn=mnist_collate,
     )
 
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=256,
+        shuffle=False,
+        num_workers=8,
+        collate_fn=mnist_collate,
+    )
+
     best_loss = float("inf")
     patience = 5
     bad_epochs = 0
@@ -165,6 +175,9 @@ def run(device):
     for epoch in range(20):
         epoch_start_time = time.time()
         model.train()
+        train_loss = 0.0
+        train_batches = 0
+        
         for images, targets in train_loader:
             images, targets = images.to(device), targets.to(device)
 
@@ -175,6 +188,11 @@ def run(device):
             optimizer.step()
             scheduler.step()
             step += 1
+            
+            train_loss += loss.item()
+            train_batches += 1
+            
+        train_loss /= train_batches
 
         # Validation
         model.eval()
@@ -195,18 +213,15 @@ def run(device):
 
         val_loss /= len(valid_loader)
         acc = correct / total
-
-        val_loss /= len(valid_loader)
-        acc = correct / total
         epoch_end_time = time.time()
         epoch_duration = epoch_end_time - epoch_start_time
 
-        print(f"Epoch {epoch}: val_loss={val_loss:.4f}, acc={acc:.4f}, time={epoch_duration:.2f}s")
+        print(f"Epoch {epoch}: train_loss={train_loss:.4f}, val_loss={val_loss:.4f}, acc={acc:.4f}, time={epoch_duration:.2f}s")
         
         metrics["epoch_metrics"].append({
             "epoch": epoch,
             "time": epoch_duration,
-            "train_loss": 0.0, # Placeholder as we aren't tracking running train loss in this loop
+            "train_loss": train_loss,
             "val_loss": val_loss,
             "accuracy": acc
         })
@@ -222,9 +237,33 @@ def run(device):
                 break
 
     # Load best model and export to ONNX
-    print("Loading best model for ONNX export...")
+    print("Loading best model for ONNX export and Test evaluation...")
     model.load_state_dict(torch.load(f"{ARTIFACT_DIR}/model.pt"))
     model.eval()
+
+    # Test Evaluation
+    test_loss = 0.0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, targets in test_loader:
+            images, targets = images.to(device), targets.to(device)
+            output = model(images)
+            loss = criterion(output, targets)
+
+            test_loss += loss.item()
+            preds = output.argmax(dim=1)
+            correct += (preds == targets).sum().item()
+            total += targets.size(0)
+
+    test_loss /= len(test_loader)
+    test_acc = correct / total
+    print(f"Test Set Evaluation: loss={test_loss:.4f}, acc={test_acc:.4f}")
+
+    metrics["test_metrics"] = {
+        "accuracy": test_acc,
+        "loss": test_loss
+    }
 
     dummy_input = torch.randn(1, 1, 28, 28, device=device)
     onnx_path = f"{ARTIFACT_DIR}/model.onnx"

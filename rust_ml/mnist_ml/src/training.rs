@@ -94,7 +94,7 @@ pub fn train<B: AutodiffBackend>(
 
 	let batcher = MnistBatcher::default();
 
-	// Dataset Splitting
+	// Dataset Splitting 80:10:10
 	let dataset = MnistDataset::train();
 	let mut items: Vec<_> = dataset.iter().collect();
 
@@ -105,11 +105,15 @@ pub fn train<B: AutodiffBackend>(
 	items.shuffle(&mut rng);
 
 	let total_len = items.len();
-	let train_len = (total_len as f64 * 0.85) as usize;
-	let (train_items, valid_items) = items.split_at(train_len);
+	let train_len = (total_len as f64 * 0.80) as usize;
+	let valid_len = (total_len as f64 * 0.10) as usize;
+
+	let (train_items, rest) = items.split_at(train_len);
+	let (valid_items, test_items) = rest.split_at(valid_len);
 
 	let train_dataset = InMemDataset::new(train_items.to_vec());
 	let valid_dataset = InMemDataset::new(valid_items.to_vec());
+	let test_dataset = InMemDataset::new(test_items.to_vec());
 
 	let dataloader_train = DataLoaderBuilder::new(batcher.clone())
 		.batch_size(config.batch_size)
@@ -117,7 +121,7 @@ pub fn train<B: AutodiffBackend>(
 		.num_workers(config.num_workers)
 		.build(train_dataset);
 
-	let dataloader_test = DataLoaderBuilder::new(batcher)
+	let dataloader_test = DataLoaderBuilder::new(batcher.clone())
 		.batch_size(config.batch_size)
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
@@ -164,6 +168,55 @@ pub fn train<B: AutodiffBackend>(
 	let duration_secs = duration.as_secs_f64();
 	let avg_epoch_duration = duration_secs / config.num_epochs as f64;
 
+	// Test Evaluation
+	let dataloader_test_final = DataLoaderBuilder::new(batcher)
+		.batch_size(config.batch_size)
+		.shuffle(config.seed)
+		.num_workers(config.num_workers)
+		.build(test_dataset);
+
+	let mut test_loss = 0.0;
+	let mut test_acc = 0.0;
+	let mut total_batches = 0;
+
+	// Use model for evaluation
+	let model_valid = &result.model;
+
+	for batch in dataloader_test_final.iter() {
+		let output = model_valid.forward_classification(batch.images, batch.targets);
+		let loss = output.loss.into_scalar();
+
+		// Calculate simple accuracy manually or using metric if cleaner
+		// Doing simple manual match for portability without full metric setup
+		let targets = output.targets.into_data();
+		let preds = output.output.argmax(1).into_data();
+		let targets_vec: Vec<i64> = targets.to_vec().expect("Should be able to convert to vec");
+		let preds_vec: Vec<i64> = preds.to_vec().expect("Should be able to convert to vec"); // Assuming argmax returns int64 compatible
+		let batch_size = targets_vec.len();
+
+		let mut correct = 0;
+		for i in 0..batch_size {
+			if targets_vec[i] == preds_vec[i] {
+				correct += 1;
+			}
+		}
+		let batch_acc = correct as f64 / batch_size as f64;
+
+		test_loss += loss.to_f64();
+		test_acc += batch_acc;
+		total_batches += 1;
+	}
+
+	if total_batches > 0 {
+		test_loss /= total_batches as f64;
+		test_acc /= total_batches as f64;
+	}
+
+	println!(
+		"Test Set Evaluation: loss={:.4}, acc={:.4}",
+		test_loss, test_acc
+	);
+
 	result
 		.model
 		.save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
@@ -207,6 +260,10 @@ pub fn train<B: AutodiffBackend>(
     }},
     "artifact_metrics": {{
         "model_size_bytes": {}
+    }},
+    "test_metrics": {{
+        "accuracy": {:.4},
+        "loss": {:.4}
     }}
 }}"#,
 		std::time::SystemTime::now()
@@ -218,7 +275,9 @@ pub fn train<B: AutodiffBackend>(
 		config.seed,
 		os_info,
 		arch_info,
-		model_size
+		model_size,
+		test_acc,
+		test_loss
 	);
 
 	fs::write(format!("{artifact_dir}/metrics.json"), json_content)
