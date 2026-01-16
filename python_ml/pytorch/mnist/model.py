@@ -16,12 +16,12 @@ class Model(nn.Module):
     def __init__(self, num_classes=NUM_CLASSES, hidden_size=512, dropout=0.5):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(1, 8, kernel_size=3)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3)
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=3, stride=1, padding=0, dilation=1, groups=1, bias=True)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=0, dilation=1, groups=1, bias=True)
         self.pool = nn.AdaptiveAvgPool2d((8, 8))
         
-        self.linear1 = nn.Linear(16 * 8 * 8, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, num_classes)
+        self.linear1 = nn.Linear(16 * 8 * 8, hidden_size, bias=True)
+        self.linear2 = nn.Linear(hidden_size, num_classes, bias=True)
 
         self.dropout = nn.Dropout(dropout)
         self.activation = nn.ReLU()
