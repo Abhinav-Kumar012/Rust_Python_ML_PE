@@ -190,8 +190,8 @@ pub fn train<B: AutodiffBackend>(
 		// Doing simple manual match for portability without full metric setup
 		let targets = output.targets.into_data();
 		let preds = output.output.argmax(1).into_data();
-		let targets_vec: Vec<i64> = targets.to_vec().expect("Should be able to convert to vec");
-		let preds_vec: Vec<i64> = preds.to_vec().expect("Should be able to convert to vec"); // Assuming argmax returns int64 compatible
+		let targets_vec: Vec<i32> = targets.to_vec().expect("Should be able to convert to vec");
+		let preds_vec: Vec<i32> = preds.to_vec().expect("Should be able to convert to vec");
 		let batch_size = targets_vec.len();
 
 		let mut correct = 0;
