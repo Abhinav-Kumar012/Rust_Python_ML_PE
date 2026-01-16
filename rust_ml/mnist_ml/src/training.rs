@@ -4,14 +4,13 @@ use crate::{
 	ModelConfig,
 	data::{MnistBatch, MnistBatcher},
 	model::Model,
-	training,
 };
 use burn::{
 	data::{
 		dataloader::DataLoaderBuilder,
 		dataset::{
-			Dataset, InMemDataset,
-			transform::{PartialDataset, SelectionDataset},
+			Dataset,
+			transform::PartialDataset,
 			vision::MnistDataset,
 		},
 	},
@@ -100,7 +99,7 @@ pub fn train<B: AutodiffBackend>(
 
 	let batcher = MnistBatcher::default();
 	let original_train_dataset = Arc::new(MnistDataset::train());
-	let original_test_dataset = Arc::new(MnistDataset::test());
+	let _original_test_dataset = Arc::new(MnistDataset::test());
 
 	// For demonstration, let's assume you want to split the *training* dataset further into
 	// an 80:20 train/validation set, or combine and then split.
@@ -111,7 +110,7 @@ pub fn train<B: AutodiffBackend>(
 
 	// Calculate split points for 80:20 from the original training set
 	let train_len = (total_len as f64 * config.split) as usize;
-	let valid_len = total_len - train_len;
+	let _valid_len = total_len - train_len;
 
 	let custom_train_split = PartialDataset::new(original_train_dataset.clone(), 0, train_len);
 	let custom_valid_split =
