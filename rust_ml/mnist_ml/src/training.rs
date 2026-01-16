@@ -1,10 +1,20 @@
+use std::sync::Arc;
+
 use crate::{
 	ModelConfig,
 	data::{MnistBatch, MnistBatcher},
 	model::Model,
+	training,
 };
 use burn::{
-	data::{dataloader::DataLoaderBuilder, dataset::vision::MnistDataset},
+	data::{
+		dataloader::DataLoaderBuilder,
+		dataset::{
+			Dataset, InMemDataset,
+			transform::{PartialDataset, SelectionDataset},
+			vision::MnistDataset,
+		},
+	},
 	nn::loss::CrossEntropyLossConfig,
 	optim::AdamConfig,
 	prelude::*,
@@ -66,6 +76,8 @@ pub struct TrainingConfig {
 	pub seed: u64,
 	#[config(default = 1.0e-4)]
 	pub learning_rate: f64,
+	#[config(default = 0.8)]
+	pub split: f64,
 }
 
 fn create_artifact_dir(artifact_dir: &str) {
@@ -87,18 +99,35 @@ pub fn train<B: AutodiffBackend>(
 	B::seed(&device, config.seed);
 
 	let batcher = MnistBatcher::default();
+	let original_train_dataset = Arc::new(MnistDataset::train());
+	let original_test_dataset = Arc::new(MnistDataset::test());
+
+	// For demonstration, let's assume you want to split the *training* dataset further into
+	// an 80:20 train/validation set, or combine and then split.
+	// If you only want to use the pre-defined train and test splits, you would just use
+	// original_train_dataset and original_test_dataset directly.
+
+	let total_len = original_train_dataset.len();
+
+	// Calculate split points for 80:20 from the original training set
+	let train_len = (total_len as f64 * config.split) as usize;
+	let valid_len = total_len - train_len;
+
+	let custom_train_split = PartialDataset::new(original_train_dataset.clone(), 0, train_len);
+	let custom_valid_split =
+		PartialDataset::new(original_train_dataset.clone(), train_len, total_len);
 
 	let dataloader_train = DataLoaderBuilder::new(batcher.clone())
 		.batch_size(config.batch_size)
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
-		.build(MnistDataset::train());
+		.build(custom_train_split);
 
 	let dataloader_test = DataLoaderBuilder::new(batcher)
 		.batch_size(config.batch_size)
 		.shuffle(config.seed)
 		.num_workers(config.num_workers)
-		.build(MnistDataset::test());
+		.build(custom_valid_split);
 	let f1metric = FBetaScoreMetric::multiclass(1.0, 1, ClassReduction::Macro);
 	let precissionmetric = PrecisionMetric::multiclass(1, ClassReduction::Macro);
 	let recallmetric = RecallMetric::multiclass(1, ClassReduction::Macro);
