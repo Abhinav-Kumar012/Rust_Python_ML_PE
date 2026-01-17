@@ -1,5 +1,5 @@
 # training.py
-# Burn-equivalent training loop (no extras)
+# Final Burn-equivalent PyTorch training pipeline
 
 import os
 import json
@@ -7,16 +7,26 @@ import time
 import platform
 import sys
 import random
+import psutil
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import MNIST
+
+from sklearn.metrics import (
+    precision_score,
+    recall_score,
+    f1_score,
+    top_k_accuracy_score,
+)
 
 from python_ml.pytorch.mnist.Training.data import (
     SimpleMnistDataset,
     mnist_collate,
 )
 from python_ml.pytorch.mnist.Training.model import Model
+
 
 ARTIFACT_DIR = "/tmp/burn_python_mnist"
 
@@ -44,7 +54,7 @@ def run(device):
         random.seed(42)
 
         # ----------------------------
-        # Dataset (exact Burn split)
+        # Dataset (80/10/10 exactly like Burn)
         # ----------------------------
         base_dataset = MNIST(".", train=True, download=True)
 
@@ -94,7 +104,7 @@ def run(device):
 
         optimizer = torch.optim.Adam(
             model.parameters(),
-            lr=1.0,
+            lr=1e-4,
         )
 
         criterion = nn.CrossEntropyLoss()
@@ -107,22 +117,20 @@ def run(device):
         for epoch in range(num_epochs):
             model.train()
             train_loss = 0.0
-            train_batches = 0
 
             for images, targets in train_loader:
                 images = images.to(device)
                 targets = targets.to(device)
 
                 optimizer.zero_grad()
-                output = model(images)
-                loss = criterion(output, targets)
+                logits = model(images)
+                loss = criterion(logits, targets)
                 loss.backward()
                 optimizer.step()
 
                 train_loss += loss.item()
-                train_batches += 1
 
-            train_loss /= train_batches
+            train_loss /= len(train_loader)
 
             # ----------------------------
             # Validation
@@ -137,11 +145,11 @@ def run(device):
                     images = images.to(device)
                     targets = targets.to(device)
 
-                    output = model(images)
-                    loss = criterion(output, targets)
+                    logits = model(images)
+                    loss = criterion(logits, targets)
 
                     val_loss += loss.item()
-                    preds = output.argmax(dim=1)
+                    preds = logits.argmax(dim=1)
 
                     correct += (preds == targets).sum().item()
                     total += targets.size(0)
@@ -157,37 +165,113 @@ def run(device):
             )
 
         # ----------------------------
-        # Test
+        # Test evaluation
         # ----------------------------
         model.eval()
+
         test_loss = 0.0
         correct = 0
         total = 0
+
+        all_logits = []
+        all_preds = []
+        all_targets = []
 
         with torch.no_grad():
             for images, targets in test_loader:
                 images = images.to(device)
                 targets = targets.to(device)
 
-                output = model(images)
-                loss = criterion(output, targets)
+                logits = model(images)
+                loss = criterion(logits, targets)
 
                 test_loss += loss.item()
-                preds = output.argmax(dim=1)
+
+                preds = logits.argmax(dim=1)
+
                 correct += (preds == targets).sum().item()
                 total += targets.size(0)
+
+                all_logits.append(logits.cpu())
+                all_preds.append(preds.cpu())
+                all_targets.append(targets.cpu())
 
         test_loss /= len(test_loader)
         test_acc = correct / total
 
-        print(
-            f"Test Set Evaluation: "
-            f"loss={test_loss:.4f}, acc={test_acc:.4f}"
+        logits = torch.cat(all_logits)
+        preds = torch.cat(all_preds)
+        targets = torch.cat(all_targets)
+
+        probs = torch.softmax(logits, dim=1).numpy()
+
+        # ----------------------------
+        # Burn-equivalent metrics
+        # ----------------------------
+        precision = precision_score(
+            targets, preds, average="macro"
         )
 
+        recall = recall_score(
+            targets, preds, average="macro"
+        )
+
+        f1 = f1_score(
+            targets, preds, average="macro"
+        )
+
+        top5 = top_k_accuracy_score(
+            targets.numpy(),
+            probs,
+            k=5,
+        )
+
+        # ----------------------------
+        # ONNX export (Track-2)
+        # ----------------------------
+        onnx_path = os.path.join(ARTIFACT_DIR, "model.onnx")
+
+        dummy_input = torch.randn(1, 1, 28, 28).to(device)
+
+        torch.onnx.export(
+            model,
+            dummy_input,
+            onnx_path,
+            export_params=True,
+            opset_version=17,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["logits"],
+            dynamic_axes={
+                "input": {0: "batch"},
+                "logits": {0: "batch"},
+            },
+        )
+
+        # ----------------------------
+        # System metrics
+        # ----------------------------
+        cpu_temp = None
+        temps = psutil.sensors_temperatures()
+        if temps:
+            for _, entries in temps.items():
+                if entries:
+                    cpu_temp = entries[0].current
+                    break
+
         metrics["test_metrics"] = {
-            "accuracy": test_acc,
-            "loss": test_loss,
+            "accuracy": float(test_acc),
+            "loss": float(test_loss),
+            "precision_macro": float(precision),
+            "recall_macro": float(recall),
+            "f1_macro": float(f1),
+            "top5_accuracy": float(top5),
+        }
+
+        metrics["system_metrics"] = {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent,
+            "cpu_temperature": cpu_temp,
         }
 
         metrics["status"] = "success"
@@ -198,7 +282,7 @@ def run(device):
         raise
 
     finally:
-        metrics["total_duration"] = time.time() - start_time
+        metrics["total_duration_sec"] = time.time() - start_time
 
         with open(f"{ARTIFACT_DIR}/metrics.json", "w") as f:
             json.dump(metrics, f, indent=4)
