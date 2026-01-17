@@ -20,8 +20,8 @@ pub struct Model<B: Backend> {
 
 impl<B: Backend> Model<B> {
 	/// # Shapes
-	///   - Images [batch_size, height, width]
-	///   - Output [batch_size, num_classes]
+	///   - Images [`batch_size`, height, width]
+	///   - Output [`batch_size`, `num_classes`]
 	pub fn forward(
 		&self,
 		images: Tensor<B, 3>,

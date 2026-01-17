@@ -37,14 +37,14 @@ pub async fn predict_handler(
 		.map_err(|e| {
 			(
 				StatusCode::BAD_REQUEST,
-				format!("Failed to read image format: {}", e),
+				format!("Failed to read image format: {e}"),
 			)
 		})?
 		.decode()
 		.map_err(|e| {
 			(
 				StatusCode::BAD_REQUEST,
-				format!("Failed to decode image: {}", e),
+				format!("Failed to decode image: {e}"),
 			)
 		})?;
 
@@ -55,7 +55,7 @@ pub async fn predict_handler(
 	// Convert to tensor [1, 28, 28]
 	let mut pixels = Vec::new();
 	for pixel in img.to_luma8().pixels() {
-		let val = pixel.0[0] as f32 / 255.0; // Normalize 0-1
+		let val = f32::from(pixel.0[0]) / 255.0; // Normalize 0-1
 		pixels.push(val);
 	}
 
