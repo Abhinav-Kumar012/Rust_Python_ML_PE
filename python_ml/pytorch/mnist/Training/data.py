@@ -17,7 +17,7 @@ def prepare_image(image, label):
     image = image.unsqueeze(0)     # [1, 28, 28]
 
     # Same normalization as Burn
-    image = (image / 255.0 - 0.1307) / 0.3081
+    image = (image - 0.1307) / 0.3081
 
     return MnistItemPrepared(image, label)
 
