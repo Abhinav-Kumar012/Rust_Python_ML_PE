@@ -1,0 +1,10 @@
+[package]
+name = "mnist_infer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+burn = { version = "~0.19", features = ["std", "tui", "train", "vision", "wgpu", "fusion", "metrics"], default-features = false }
+
+[lints]
+workspace = true
