@@ -1,0 +1,6 @@
+target/
+.git/
+.env
+**/*.pyc
+__pycache__
+python_ml/
