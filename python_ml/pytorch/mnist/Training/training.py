@@ -1,5 +1,5 @@
 # training.py
-# Final Burn-equivalent PyTorch training pipeline
+# PyTorch training pipeline aligned with the Burn implementation
 
 import os
 import json
@@ -13,6 +13,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import MNIST
+from torchvision import transforms
+
 
 from sklearn.metrics import (
     precision_score,
@@ -56,7 +58,12 @@ def run(device):
         # ----------------------------
         # Dataset (80/10/10 exactly like Burn)
         # ----------------------------
-        base_dataset = MNIST(".", train=True, download=True)
+        base_dataset = MNIST(
+            ".",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor(),
+        )
 
         total_len = len(base_dataset)
         train_len = int(0.8 * total_len)
@@ -199,12 +206,11 @@ def run(device):
         test_loss /= len(test_loader)
         test_acc = correct / total
 
-        logits = torch.cat(all_logits)
+        combined_logits = torch.cat(all_logits)
         preds = torch.cat(all_preds)
         targets = torch.cat(all_targets)
 
-        probs = torch.softmax(logits, dim=1).numpy()
-
+        probs = torch.softmax(combined_logits, dim=1).detach().numpy()
         # ----------------------------
         # Burn-equivalent metrics
         # ----------------------------
@@ -221,7 +227,7 @@ def run(device):
         )
 
         top5 = top_k_accuracy_score(
-            targets.numpy(),
+            targets.detach().numpy(),
             probs,
             k=5,
         )
@@ -247,17 +253,21 @@ def run(device):
                 "logits": {0: "batch"},
             },
         )
+        print(f"ONNX model exported to {onnx_path}")
 
         # ----------------------------
         # System metrics
         # ----------------------------
         cpu_temp = None
-        temps = psutil.sensors_temperatures()
-        if temps:
-            for _, entries in temps.items():
-                if entries:
-                    cpu_temp = entries[0].current
-                    break
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for _, entries in temps.items():
+                    if entries:
+                        cpu_temp = entries[0].current
+                        break
+        except Exception:
+            cpu_temp = None
 
         metrics["test_metrics"] = {
             "accuracy": float(test_acc),
@@ -269,7 +279,7 @@ def run(device):
         }
 
         metrics["system_metrics"] = {
-            "cpu_percent": psutil.cpu_percent(),
+            "cpu_percent": psutil.cpu_percent(interval=1.0),
             "memory_percent": psutil.virtual_memory().percent,
             "cpu_temperature": cpu_temp,
         }
