@@ -43,7 +43,7 @@ async fn main() {
 		.with_state(state);
 
 	// Run Server
-	let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+	let addr = SocketAddr::from(([0, 0, 0, 0], 9050));
 	tracing::info!("listening on {}", addr);
 
 	let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
