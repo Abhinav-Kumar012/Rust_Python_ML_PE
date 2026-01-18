@@ -16,3 +16,6 @@ model/
 
 # mac files
 **/.DS_Store
+
+# log files
+**/*.log
