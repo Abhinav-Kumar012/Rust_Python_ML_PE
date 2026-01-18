@@ -3,14 +3,25 @@ import os
 import psutil
 import numpy as np
 import onnxruntime as ort
-import torch
-from torchvision.datasets import MNIST
-from fastapi import FastAPI
+from PIL import Image
+from io import BytesIO
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 
 # ----------------------------
 # App + process setup
 # ----------------------------
 app = FastAPI()
+
+# Add CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 process = psutil.Process(os.getpid())
 start_time = time.time()
 
@@ -23,21 +34,23 @@ session = ort.InferenceSession(
 )
 
 # ----------------------------
-# Load MNIST (inference only)
-# ----------------------------
-mnist = MNIST(
-    root=".",
-    train=False,
-    download=True
-)
-
-# ----------------------------
 # Normalization (must match training)
 # ----------------------------
-def preprocess(image):
-    x = image.float().unsqueeze(0)           # [1, 28, 28]
-    x = (x / 255.0 - 0.1307) / 0.3081
-    return x.unsqueeze(0).numpy()             # [1, 1, 28, 28]
+def preprocess(image_bytes):
+    # Open image from bytes
+    img = Image.open(BytesIO(image_bytes)).convert('L') # Grayscale
+    img = img.resize((28, 28), Image.Resampling.LANCZOS)
+    
+    # Preprocess
+    img_np = np.array(img).astype(np.float32)
+    x = img_np / 255.0
+    x = (x - 0.1307) / 0.3081
+    
+    # Add batch and channel dims: [1, 1, 28, 28]
+    x = np.expand_dims(x, axis=0) 
+    x = np.expand_dims(x, axis=0)
+    
+    return x.astype(np.float32)
 
 # ----------------------------
 # Metrics helper
@@ -50,20 +63,13 @@ def system_metrics():
     }
 
 # ----------------------------
-# Inference endpoint
+# Inference endpoint for File Upload
 # ----------------------------
-@app.get("/infer")
-def infer(index: int = 0):
-    """
-    Inference on a real MNIST test image.
-
-    Query param:
-    - index: MNIST test index (0–9999)
-    """
-
-    image, label = mnist[index]
-
-    input_tensor = preprocess(image)
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    contents = await file.read()
+    
+    input_tensor = preprocess(contents)
 
     t0 = time.perf_counter()
     outputs = session.run(None, {"input": input_tensor})
@@ -73,16 +79,16 @@ def infer(index: int = 0):
 
     return {
         "prediction": prediction,
-        "ground_truth": int(label),
-        "latency_ms": latency_ms,
-        **system_metrics()
+        "meta": {
+            "latency_ms": latency_ms,
+            "resources": system_metrics(),
+            "security_context": {
+                "service_version": "0.1.0-pytorch",
+                "model_version": "v1-onnx"
+            }
+        }
     }
 
-# ----------------------------
-# Warmup endpoint (optional)
-# ----------------------------
-@app.get("/warmup")
-def warmup():
-    dummy = np.zeros((1, 1, 28, 28), dtype=np.float32)
-    session.run(None, {"input": dummy})
-    return {"status": "warmed"}
+@app.get("/health")
+def health():
+    return {"status": "ok"}
