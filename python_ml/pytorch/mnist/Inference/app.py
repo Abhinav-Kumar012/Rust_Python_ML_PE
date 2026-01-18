@@ -6,6 +6,8 @@ import onnxruntime as ort
 import torch
 from torchvision.datasets import MNIST
 from fastapi import FastAPI
+from torchvision import transforms
+
 
 # ----------------------------
 # App + process setup
@@ -28,16 +30,19 @@ session = ort.InferenceSession(
 mnist = MNIST(
     root=".",
     train=False,
-    download=True
+    download=True,
+    transform=transforms.ToTensor()
 )
+
 
 # ----------------------------
 # Normalization (must match training)
 # ----------------------------
 def preprocess(image):
-    x = image.float().unsqueeze(0)           # [1, 28, 28]
-    x = (x / 255.0 - 0.1307) / 0.3081
-    return x.unsqueeze(0).numpy()             # [1, 1, 28, 28]
+    # image: Tensor [1, 28, 28] in range [0,1]
+    x = (image - 0.1307) / 0.3081
+    return x.unsqueeze(0).numpy().astype(np.float32)
+          # [1, 1, 28, 28]
 
 # ----------------------------
 # Metrics helper
