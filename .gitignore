@@ -20,3 +20,5 @@ model/
 
 # log files
 **/*.log
+benchmark_logs
+data/benchmark_images
