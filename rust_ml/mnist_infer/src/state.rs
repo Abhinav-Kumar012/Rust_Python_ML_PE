@@ -1,7 +1,6 @@
-use burn::backend::NdArray;
-use burn::backend::ndarray::NdArrayDevice;
+use burn::backend::ndarray::{NdArray, NdArrayDevice};
 use burn::module::Module;
-use burn::record::{FullPrecisionSettings, NamedMpkFileRecorder};
+use burn::record::CompactRecorder;
 use std::sync::{Arc, Mutex};
 
 use crate::model::{Model, ModelConfig};
@@ -25,7 +24,8 @@ impl AppState {
 		let model = config.init(&device);
 
 		// Load pre-trained weights
-		let recorder = NamedMpkFileRecorder::<FullPrecisionSettings>::new();
+		// Using CompactRecorder as used in training
+		let recorder = CompactRecorder::new();
 		let model = model
 			.load_file(model_path, &recorder, &device)
 			.expect("Failed to load model weights");

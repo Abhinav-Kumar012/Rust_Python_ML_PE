@@ -90,6 +90,8 @@ pub async fn predict_handler(
 	let mut pixels = Vec::new();
 	for pixel in img.to_luma8().pixels() {
 		let val = pixel.0[0] as f32 / 255.0;
+		// RE-APPLYING NORMALIZATION FIX FROM PREVIOUS STEP
+		// (val - 0.1307) / 0.3081
 		let normalized = (val - 0.1307) / 0.3081;
 		pixels.push(normalized);
 	}
@@ -122,7 +124,8 @@ pub async fn predict_handler(
 		},
 		security_context: SecurityContext {
 			service_version: env!("CARGO_PKG_VERSION").to_string(),
-			model_version: "v1-sha256-placeholder".to_string(), // Ideally injected or computed hash of model file
+			// Not strictly SHA256, but placeholder for now
+			model_version: "v1-burn-mpk".to_string(),
 		},
 	};
 
