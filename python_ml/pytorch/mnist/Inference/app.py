@@ -1,28 +1,35 @@
 import time
-import os
-import psutil
-import numpy as np
-import onnxruntime as ort
 import torch
-from torchvision.datasets import MNIST
 from fastapi import FastAPI
+from torchvision.datasets import MNIST
 from torchvision import transforms
 
+from model import Model
+
 
 # ----------------------------
-# App + process setup
+# App setup
 # ----------------------------
 app = FastAPI()
-process = psutil.Process(os.getpid())
 start_time = time.time()
 
+device = torch.device("cpu")
+
+# Stabilize latency
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
+
 # ----------------------------
-# Load ONNX model once (cold start)
+# Load PyTorch model (.pt)
 # ----------------------------
-session = ort.InferenceSession(
-    "model.onnx",
-    providers=["CPUExecutionProvider"]
-)
+checkpoint = torch.load("model.pt", map_location=device)
+
+model = Model(**checkpoint["model_args"])
+model.load_state_dict(checkpoint["model_state"])
+model.eval()
+model.to(device)
+
 
 # ----------------------------
 # Load MNIST (inference only)
@@ -36,23 +43,13 @@ mnist = MNIST(
 
 
 # ----------------------------
-# Normalization (must match training)
+# Normalization (same as training)
 # ----------------------------
 def preprocess(image):
     # image: Tensor [1, 28, 28] in range [0,1]
     x = (image - 0.1307) / 0.3081
-    return x.unsqueeze(0).numpy().astype(np.float32)
-          # [1, 1, 28, 28]
+    return x.unsqueeze(0)   # [1, 1, 28, 28]
 
-# ----------------------------
-# Metrics helper
-# ----------------------------
-def system_metrics():
-    return {
-        "rss_mb": process.memory_info().rss / (1024 ** 2),
-        "cpu_percent": process.cpu_percent(interval=None),
-        "uptime_sec": time.time() - start_time,
-    }
 
 # ----------------------------
 # Inference endpoint
@@ -68,26 +65,29 @@ def infer(index: int = 0):
 
     image, label = mnist[index]
 
-    input_tensor = preprocess(image)
+    x = preprocess(image).to(device)
 
     t0 = time.perf_counter()
-    outputs = session.run(None, {"input": input_tensor})
+    with torch.no_grad():
+        logits = model(x)
     latency_ms = (time.perf_counter() - t0) * 1000
 
-    prediction = int(np.argmax(outputs[0]))
+    prediction = int(torch.argmax(logits, dim=1))
 
     return {
         "prediction": prediction,
         "ground_truth": int(label),
         "latency_ms": latency_ms,
-        **system_metrics()
+        "uptime_sec": time.time() - start_time,
     }
 
+
 # ----------------------------
-# Warmup endpoint (optional)
+# Warmup endpoint
 # ----------------------------
 @app.get("/warmup")
 def warmup():
-    dummy = np.zeros((1, 1, 28, 28), dtype=np.float32)
-    session.run(None, {"input": dummy})
+    dummy = torch.zeros(1, 1, 28, 28)
+    with torch.no_grad():
+        model(dummy)
     return {"status": "warmed"}

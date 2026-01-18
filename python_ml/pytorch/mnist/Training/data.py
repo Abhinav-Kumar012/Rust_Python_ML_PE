@@ -1,22 +1,18 @@
-# data.py
-# Burn-equivalent MNIST data pipeline
-
 import torch
 from torch.utils.data import Dataset
 
 
 class MnistItemPrepared:
     def __init__(self, image, label):
-        self.image = image          # [1, 28, 28]
+        self.image = image      # [1, 28, 28]
         self.label = label
 
 
 def prepare_image(image, label):
-    # image: [28, 28], uint8
+    # image: Tensor [1, 28, 28] in range [0,1]
     image = image.float()
-    image = image.unsqueeze(0)     # [1, 28, 28]
 
-    # Same normalization as Burn
+    # Burn normalization
     image = (image - 0.1307) / 0.3081
 
     return MnistItemPrepared(image, label)
@@ -40,4 +36,6 @@ def mnist_collate(batch):
         [item.label for item in batch],
         dtype=torch.long
     )
-    return images.squeeze(1), targets
+
+    # images: [B, 1, 28, 28]
+    return images, targets

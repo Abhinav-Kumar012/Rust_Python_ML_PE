@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /wheels
 
+# Build dependencies (for psutil, torch, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -27,22 +28,28 @@ FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# Torch CPU tuning
 ENV OMP_NUM_THREADS=1
 ENV MKL_NUM_THREADS=1
 
 WORKDIR /app
 
+# Runtime-only system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
+# Install prebuilt wheels
 COPY --from=builder /wheels /wheels
 
 RUN pip install --no-cache-dir /wheels/*.whl && \
     rm -rf /wheels
 
+# Application files
 COPY app.py .
-COPY model.onnx .
+COPY model.py .
+COPY model.pt .
 
 EXPOSE 8000
 
