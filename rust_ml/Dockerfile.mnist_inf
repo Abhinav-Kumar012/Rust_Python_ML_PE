@@ -1,10 +1,7 @@
 # Build Stage
-FROM rust:1.80-slim-bookworm as builder
+FROM rust:1.92-alpine as builder
 
 WORKDIR /app
-
-# Create a blank project to cache dependencies
-RUN USER=root cargo new --bin rust_ml
 
 WORKDIR /app/rust_ml
 
@@ -18,19 +15,16 @@ WORKDIR /app/rust_ml
 # This assumes the build context is the `Rest_Python_ML_PE` root or `rust_ml` root.
 # Given the user wants to `containerize this pipeline`, let's assume the build context is the repo root.
 
-COPY ./rust_ml/Cargo.toml ./Cargo.toml
-COPY ./rust_ml/Cargo.lock ./Cargo.lock
-COPY ./rust_ml/mnist_infer ./mnist_infer
-COPY ./rust_ml/mnist_ml ./mnist_ml
+COPY . /app/rust_ml/
 
 # Build the release binary for mnist_infer
-RUN cargo build --release --bin mnist_infer
+RUN cargo build --release -p mnist_infer
 
 # Runtime Stage
-FROM debian:bookworm-slim
+FROM alpine:3.23
 
 # Install OpenSSL if needed (Axum/Tokio might need it) and ca-certificates
-RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache openssl-dev ca-certificates
 
 WORKDIR /app
 
@@ -41,12 +35,12 @@ COPY --from=builder /app/rust_ml/target/release/mnist_infer /app/mnist_infer
 # Assuming build context is repo root, we need to copy model/mnist_rust/model.mpk
 # We'll expect the model to be copied into the container at runtime or build time.
 # Let's copy it at build time as requested "containerized pipeline".
-COPY model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
+COPY ./model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
 
 # Environment variables
 ENV RUST_LOG=info
-ENV MODEL_PATH=model/mnist_rust/model.mpk
+ENV MODEL_PATH=/app/model/mnist_rust/model.mpk
 
-EXPOSE 8080
+EXPOSE 9050
 
 CMD ["./mnist_infer"]

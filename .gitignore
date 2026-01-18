@@ -12,6 +12,7 @@ rust_ml/target/
 **/*.rs.bk
 
 # model
+rust_ml/model/
 model/
 
 # mac files
