@@ -107,8 +107,18 @@ const InferencePage = ({ title, apiEndpoint, themeColor }) => {
                                     ) : (
                                         <div className="flex flex-col items-center p-4 text-center">
                                             <Upload className="mb-4 h-10 w-10 text-neutral-500" />
-                                            <p className="text-sm text-neutral-400">Drag image or click to upload</p>
-                                            <p className="mt-2 text-xs text-neutral-600">Supports PNG, JPG</p>
+                                            <p className="text-sm text-neutral-400 mb-2">Drag image here</p>
+                                            <button
+                                                type="button"
+                                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm font-medium text-white transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    fileInputRef.current?.click();
+                                                }}
+                                            >
+                                                Select Image
+                                            </button>
+                                            <p className="mt-4 text-xs text-neutral-600">Supports PNG, JPG</p>
                                         </div>
                                     )}
                                     <input
