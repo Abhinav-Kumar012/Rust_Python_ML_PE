@@ -90,7 +90,8 @@ pub async fn predict_handler(
 	let mut pixels = Vec::new();
 	for pixel in img.to_luma8().pixels() {
 		let val = pixel.0[0] as f32 / 255.0;
-		pixels.push(val);
+		let normalized = (val - 0.1307) / 0.3081;
+		pixels.push(normalized);
 	}
 
 	let shape = Shape::new([1, 28, 28]);
