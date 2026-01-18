@@ -18,7 +18,10 @@ model/
 # mac files
 **/.DS_Store
 
+# images folders
+data/benchmark_images
+python_ml/benchmark/test_data
+
 # log files
 **/*.log
 benchmark_logs
-data/benchmark_images

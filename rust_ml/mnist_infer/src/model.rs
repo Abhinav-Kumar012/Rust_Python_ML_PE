@@ -1,4 +1,3 @@
-
 use burn::{
 	nn::{
 		Dropout, DropoutConfig, Linear, LinearConfig, Relu,

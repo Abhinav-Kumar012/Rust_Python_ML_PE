@@ -30,7 +30,7 @@ async fn main() {
 	// We'll trust the user/env to run it from correct place or Docker.
 	let model_path = std::env::var("MODEL_PATH")
 		.unwrap_or_else(|_| -> String { "./model/mnist_rust/model.mpk".to_string() });
-	dbg!(&model_path);
+	// dbg!(&model_path);
 
 	let state = AppState::new(&model_path);
 
