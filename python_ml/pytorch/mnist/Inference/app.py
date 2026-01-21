@@ -1,94 +1,93 @@
 import time
-import os
-import psutil
-import numpy as np
-import onnxruntime as ort
-from PIL import Image
-from io import BytesIO
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
+import torch
+from fastapi import FastAPI
+from torchvision.datasets import MNIST
+from torchvision import transforms
+
+from model import Model
+
 
 # ----------------------------
-# App + process setup
+# App setup
 # ----------------------------
 app = FastAPI()
-
-# Add CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-process = psutil.Process(os.getpid())
 start_time = time.time()
 
+device = torch.device("cpu")
+
+# Stabilize latency
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
+
 # ----------------------------
-# Load ONNX model once (cold start)
+# Load PyTorch model (.pt)
 # ----------------------------
-session = ort.InferenceSession(
-    "model.onnx",
-    providers=["CPUExecutionProvider"]
+checkpoint = torch.load("model.pt", map_location=device)
+
+model = Model(**checkpoint["model_args"])
+model.load_state_dict(checkpoint["model_state"])
+model.eval()
+model.to(device)
+
+
+# ----------------------------
+# Load MNIST (inference only)
+# ----------------------------
+mnist = MNIST(
+    root=".",
+    train=False,
+    download=True,
+    transform=transforms.ToTensor()
 )
 
-# ----------------------------
-# Normalization (must match training)
-# ----------------------------
-def preprocess(image_bytes):
-    # Open image from bytes
-    img = Image.open(BytesIO(image_bytes)).convert('L') # Grayscale
-    img = img.resize((28, 28), Image.Resampling.LANCZOS)
-    
-    # Preprocess
-    img_np = np.array(img).astype(np.float32)
-    x = img_np / 255.0
-    x = (x - 0.1307) / 0.3081
-    
-    # Add batch and channel dims: [1, 1, 28, 28]
-    x = np.expand_dims(x, axis=0) 
-    x = np.expand_dims(x, axis=0)
-    
-    return x.astype(np.float32)
 
 # ----------------------------
-# Metrics helper
+# Normalization (same as training)
 # ----------------------------
-def system_metrics():
-    return {
-        "rss_mb": process.memory_info().rss / (1024 ** 2),
-        "cpu_percent": process.cpu_percent(interval=None),
-        "uptime_sec": time.time() - start_time,
-    }
+def preprocess(image):
+    # image: Tensor [1, 28, 28] in range [0,1]
+    x = (image - 0.1307) / 0.3081
+    return x.unsqueeze(0)   # [1, 1, 28, 28]
+
 
 # ----------------------------
 # Inference endpoint for File Upload
 # ----------------------------
-@app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    contents = await file.read()
-    
-    input_tensor = preprocess(contents)
+@app.get("/infer")
+def infer(index: int = 0):
+    """
+    Inference on a real MNIST test image.
+
+    Query param:
+    - index: MNIST test index (0–9999)
+    """
+
+    image, label = mnist[index]
+
+    x = preprocess(image).to(device)
 
     t0 = time.perf_counter()
-    outputs = session.run(None, {"input": input_tensor})
+    with torch.no_grad():
+        logits = model(x)
     latency_ms = (time.perf_counter() - t0) * 1000
 
-    prediction = int(np.argmax(outputs[0]))
+    prediction = int(torch.argmax(logits, dim=1))
 
     return {
         "prediction": prediction,
-        "meta": {
-            "latency_ms": latency_ms,
-            "resources": system_metrics(),
-            "security_context": {
-                "service_version": "0.1.0-pytorch",
-                "model_version": "v1-onnx"
-            }
-        }
+        "ground_truth": int(label),
+        "latency_ms": latency_ms,
+        "uptime_sec": time.time() - start_time,
     }
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+
+# ----------------------------
+# Warmup endpoint
+# ----------------------------
+@app.get("/warmup")
+def warmup():
+    dummy = torch.zeros(1, 1, 28, 28)
+    with torch.no_grad():
+        model(dummy)
+    return {"status": "warmed"}
