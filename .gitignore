@@ -12,10 +12,16 @@ rust_ml/target/
 **/*.rs.bk
 
 # model
+rust_ml/model/
 model/
 
 # mac files
 **/.DS_Store
 
-# dataset
-MNIST
+# images folders
+data/benchmark_images
+python_ml/benchmark/test_data
+
+# log files
+**/*.log
+benchmark_logs

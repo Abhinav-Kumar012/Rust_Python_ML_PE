@@ -1,0 +1,46 @@
+# Build Stage
+FROM rust:1.92-alpine as builder
+
+WORKDIR /app
+
+WORKDIR /app/rust_ml
+
+# Copy workspace Cargo.toml to help with workspace resolution (optional, but good practice)
+# But here we are building a specific crate inside a workspace potentially.
+# Let's assume we copy the whole workspace context or at least the relevant parts.
+# Since we are inside `rust_ml` workspace, we should copy the root Cargo.toml and the crates.
+
+# Actually, to keep it simple and robust:
+# We'll copy the entire rust_ml directory context into the build container.
+# This assumes the build context is the `Rest_Python_ML_PE` root or `rust_ml` root.
+# Given the user wants to `containerize this pipeline`, let's assume the build context is the repo root.
+
+COPY . /app/rust_ml/
+
+# Build the release binary for mnist_infer
+RUN cargo build --release -p mnist_infer
+
+# Runtime Stage
+FROM alpine:3.23
+
+# Install OpenSSL if needed (Axum/Tokio might need it) and ca-certificates
+RUN apk add --no-cache openssl-dev ca-certificates
+
+WORKDIR /app
+
+# Copy binary
+COPY --from=builder /app/rust_ml/target/release/mnist_infer /app/mnist_infer
+
+# Copy Model
+# Assuming build context is repo root, we need to copy model/mnist_rust/model.mpk
+# We'll expect the model to be copied into the container at runtime or build time.
+# Let's copy it at build time as requested "containerized pipeline".
+COPY ./model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
+
+# Environment variables
+ENV RUST_LOG=info
+ENV MODEL_PATH=/app/model/mnist_rust/model.mpk
+
+EXPOSE 9050
+
+CMD ["./mnist_infer"]

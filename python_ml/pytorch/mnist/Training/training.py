@@ -38,6 +38,92 @@ def normalize(x):
 def run(device):
     os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
+    # Configuration matching Rust TrainingConfig
+    BATCH_SIZE = 64
+    NUM_EPOCHS = 10
+    LEARNING_RATE = 1.0e-4
+    SEED = 42
+    NUM_WORKERS = 4 
+
+    # ----------------------------
+    # Reproducibility
+    # ----------------------------
+    # Rust: B::seed(&device, config.seed);
+    # Rust: let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+    torch.manual_seed(SEED)
+    random.seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+
+    # ----------------------------
+    # Model & optimizer
+    # ----------------------------
+    # Rust: config.model.init::<B>(&device)
+    model = Model(dropout=0.5).to(device)
+
+    # Rust: config.optimizer.init() -> AdamConfig default is Adam
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=LEARNING_RATE,
+        eps=1e-5, 
+    )
+
+    criterion = nn.CrossEntropyLoss()
+
+    # ----------------------------
+    # Dataset
+    # ----------------------------
+    
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))
+    ])
+
+    base_train = MNIST(".", train=True, download=True, transform=transform)
+
+    # Rust: items.shuffle(&mut rng); -> shuffle indices
+    # Rust: Split 80:10:10
+    
+    total_len = len(base_train)
+    indices = list(range(total_len))
+    random.Random(SEED).shuffle(indices) # Match Rust shuffling with seed 42
+    
+    train_len = int(0.8 * total_len)
+    valid_len = int(0.1 * total_len)
+    test_len = total_len - train_len - valid_len 
+
+    train_indices = indices[:train_len]
+    valid_indices = indices[train_len : train_len + valid_len]
+    test_indices = indices[train_len + valid_len :]
+
+    train_ds = Subset(base_train, train_indices)
+    valid_ds = Subset(base_train, valid_indices)
+    test_ds = Subset(base_train, test_indices)
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=BATCH_SIZE,
+        shuffle=True, # Rust: dataloader_train...shuffle(config.seed)
+        num_workers=NUM_WORKERS,
+    )
+
+    valid_loader = DataLoader(
+        valid_ds,
+        batch_size=BATCH_SIZE,
+        shuffle=True, # Rust: dataloader_test...shuffle(config.seed) (Used for validation)
+        num_workers=NUM_WORKERS,
+    )
+
+    test_loader = DataLoader(
+        test_ds,
+        batch_size=BATCH_SIZE,
+        shuffle=True, # Rust: dataloader_test_final...shuffle(config.seed)
+        num_workers=NUM_WORKERS,
+    )
+
+    # ----------------------------
+    # Training loop
+    # ----------------------------
     metrics = {
         "timestamp": time.time(),
         "status": "pending",

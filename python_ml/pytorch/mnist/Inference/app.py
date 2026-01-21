@@ -52,7 +52,7 @@ def preprocess(image):
 
 
 # ----------------------------
-# Inference endpoint
+# Inference endpoint for File Upload
 # ----------------------------
 @app.get("/infer")
 def infer(index: int = 0):

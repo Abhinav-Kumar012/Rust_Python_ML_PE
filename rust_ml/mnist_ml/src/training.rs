@@ -200,7 +200,7 @@ pub fn train<B: AutodiffBackend>(
 				correct += 1;
 			}
 		}
-		let batch_acc = correct as f64 / batch_size as f64;
+		let batch_acc = f64::from(correct) / batch_size as f64;
 
 		test_loss += loss.to_f64();
 		test_acc += batch_acc;
@@ -208,14 +208,11 @@ pub fn train<B: AutodiffBackend>(
 	}
 
 	if total_batches > 0 {
-		test_loss /= total_batches as f64;
-		test_acc /= total_batches as f64;
+		test_loss /= f64::from(total_batches);
+		test_acc /= f64::from(total_batches);
 	}
 
-	println!(
-		"Test Set Evaluation: loss={:.4}, acc={:.4}",
-		test_loss, test_acc
-	);
+	println!("Test Set Evaluation: loss={test_loss:.4}, acc={test_acc:.4}");
 
 	result
 		.model

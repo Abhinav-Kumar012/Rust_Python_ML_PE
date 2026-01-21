@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mnist_ml"]
+members = ["mnist_infer","mnist_ml"]
 
 [workspace.lints.clippy]
 all = "warn"
