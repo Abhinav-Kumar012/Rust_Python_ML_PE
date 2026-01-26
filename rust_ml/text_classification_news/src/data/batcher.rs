@@ -12,9 +12,9 @@
 
 use super::{dataset::TextClassificationItem, tokenizer::Tokenizer};
 use burn::{
-    data::dataloader::batcher::Batcher,
-    nn::attention::{SeqLengthOption, generate_padding_mask},
-    prelude::*,
+	data::dataloader::batcher::Batcher,
+	nn::attention::{SeqLengthOption, generate_padding_mask},
+	prelude::*,
 };
 use derive_new::new;
 use std::sync::Arc;
@@ -22,89 +22,93 @@ use std::sync::Arc;
 /// Struct for batching text classification items
 #[derive(Clone, new)]
 pub struct TextClassificationBatcher {
-    tokenizer: Arc<dyn Tokenizer>, // Tokenizer for converting text to token IDs
-    seq_length: SeqLengthOption,   // Sequence length option for tokenized text
+	tokenizer: Arc<dyn Tokenizer>, // Tokenizer for converting text to token IDs
+	seq_length: SeqLengthOption,   // Sequence length option for tokenized text
 }
 
 /// Struct for training batch in text classification task
 #[derive(Debug, Clone, new)]
 pub struct TextClassificationTrainingBatch<B: Backend> {
-    pub tokens: Tensor<B, 2, Int>,    // Tokenized text
-    pub labels: Tensor<B, 1, Int>,    // Labels of the text
-    pub mask_pad: Tensor<B, 2, Bool>, // Padding mask for the tokenized text
+	pub tokens: Tensor<B, 2, Int>,    // Tokenized text
+	pub labels: Tensor<B, 1, Int>,    // Labels of the text
+	pub mask_pad: Tensor<B, 2, Bool>, // Padding mask for the tokenized text
 }
 
 /// Struct for inference batch in text classification task
 #[derive(Debug, Clone, new)]
 pub struct TextClassificationInferenceBatch<B: Backend> {
-    pub tokens: Tensor<B, 2, Int>,    // Tokenized text
-    pub mask_pad: Tensor<B, 2, Bool>, // Padding mask for the tokenized text
+	pub tokens: Tensor<B, 2, Int>,    // Tokenized text
+	pub mask_pad: Tensor<B, 2, Bool>, // Padding mask for the tokenized text
 }
 
 /// Implement Batcher trait for TextClassificationBatcher struct for training
 impl<B: Backend> Batcher<B, TextClassificationItem, TextClassificationTrainingBatch<B>>
-    for TextClassificationBatcher
+	for TextClassificationBatcher
 {
-    /// Batches a vector of text classification items into a training batch
-    fn batch(
-        &self,
-        items: Vec<TextClassificationItem>,
-        device: &B::Device,
-    ) -> TextClassificationTrainingBatch<B> {
-        let mut tokens_list = Vec::with_capacity(items.len());
-        let mut labels_list = Vec::with_capacity(items.len());
+	/// Batches a vector of text classification items into a training batch
+	fn batch(
+		&self,
+		items: Vec<TextClassificationItem>,
+		device: &B::Device,
+	) -> TextClassificationTrainingBatch<B> {
+		let mut tokens_list = Vec::with_capacity(items.len());
+		let mut labels_list = Vec::with_capacity(items.len());
 
-        // Tokenize text and create label tensor for each item
-        for item in items {
-            tokens_list.push(self.tokenizer.encode(&item.text));
-            labels_list.push(Tensor::from_data(
-                TensorData::from([(item.label as i64).elem::<B::IntElem>()]),
-                device,
-            ));
-        }
+		// Tokenize text and create label tensor for each item
+		for item in items {
+			tokens_list.push(self.tokenizer.encode(&item.text));
+			labels_list.push(Tensor::from_data(
+				TensorData::from([(item.label as i64).elem::<B::IntElem>()]),
+				device,
+			));
+		}
 
-        // Generate padding mask for tokenized text
-        let mask = generate_padding_mask(
-            self.tokenizer.pad_token(),
-            tokens_list,
-            self.seq_length,
-            device,
-        );
+		// Generate padding mask for tokenized text
+		let mask = generate_padding_mask(
+			self.tokenizer.pad_token(),
+			tokens_list,
+			self.seq_length,
+			device,
+		);
 
-        // Create and return training batch
-        TextClassificationTrainingBatch {
-            tokens: mask.tensor,
-            labels: Tensor::cat(labels_list, 0),
-            mask_pad: mask.mask,
-        }
-    }
+		// Create and return training batch
+		TextClassificationTrainingBatch {
+			tokens: mask.tensor,
+			labels: Tensor::cat(labels_list, 0),
+			mask_pad: mask.mask,
+		}
+	}
 }
 
 /// Implement Batcher trait for TextClassificationBatcher struct for inference
 impl<B: Backend> Batcher<B, String, TextClassificationInferenceBatch<B>>
-    for TextClassificationBatcher
+	for TextClassificationBatcher
 {
-    /// Batches a vector of strings into an inference batch
-    fn batch(&self, items: Vec<String>, device: &B::Device) -> TextClassificationInferenceBatch<B> {
-        let mut tokens_list = Vec::with_capacity(items.len());
+	/// Batches a vector of strings into an inference batch
+	fn batch(
+		&self,
+		items: Vec<String>,
+		device: &B::Device,
+	) -> TextClassificationInferenceBatch<B> {
+		let mut tokens_list = Vec::with_capacity(items.len());
 
-        // Tokenize each string
-        for item in items {
-            tokens_list.push(self.tokenizer.encode(&item));
-        }
+		// Tokenize each string
+		for item in items {
+			tokens_list.push(self.tokenizer.encode(&item));
+		}
 
-        // Generate padding mask for tokenized text
-        let mask = generate_padding_mask(
-            self.tokenizer.pad_token(),
-            tokens_list,
-            self.seq_length,
-            device,
-        );
+		// Generate padding mask for tokenized text
+		let mask = generate_padding_mask(
+			self.tokenizer.pad_token(),
+			tokens_list,
+			self.seq_length,
+			device,
+		);
 
-        // Create and return inference batch
-        TextClassificationInferenceBatch {
-            tokens: mask.tensor.to_device(device),
-            mask_pad: mask.mask.to_device(device),
-        }
-    }
+		// Create and return inference batch
+		TextClassificationInferenceBatch {
+			tokens: mask.tensor.to_device(device),
+			mask_pad: mask.mask.to_device(device),
+		}
+	}
 }

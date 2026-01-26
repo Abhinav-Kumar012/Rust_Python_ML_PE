@@ -13,13 +13,11 @@ burn = { version = "~0.20", features = [
     "autotune",
     "fusion",
     "std",
+    "wgpu",
 ], default-features = false }
-log ={ version = "0.4" }
+log = { version = "0.4" }
 derive-new = "0.5"
-tokenizers ={ version = "0.22.2",features = [
-    "onig",
-    "http",
-] }
+tokenizers = { version = "0.22.2", features = ["onig", "http"] }
 serde = { version = "1.0.228" }
 [lints]
 workspace = true
