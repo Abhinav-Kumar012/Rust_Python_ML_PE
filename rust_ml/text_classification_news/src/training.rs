@@ -24,7 +24,9 @@ use burn::{
 	train::{
 		MultiDeviceOptim,
 		metric::{
-			AccuracyMetric, CudaMetric, IterationSpeedMetric, LearningRateMetric, LossMetric,
+			AccuracyMetric, ClassReduction, CpuMemory, CpuTemperature, CpuUse, CudaMetric,
+			FBetaScoreMetric, IterationSpeedMetric, LearningRateMetric, LossMetric,
+			PrecisionMetric, RecallMetric, TopKAccuracyMetric,
 		},
 	},
 };
@@ -85,7 +87,9 @@ pub fn train<B: AutodiffBackend, D: TextClassificationDataset + 'static>(
 		.with_model_size(config.transformer.d_model)
 		.init()
 		.unwrap();
-
+	let f1metric = FBetaScoreMetric::multiclass(1.0, 1, ClassReduction::Macro);
+	let precissionmetric = PrecisionMetric::multiclass(1, ClassReduction::Macro);
+	let recallmetric = RecallMetric::multiclass(1, ClassReduction::Macro);
 	// Initialize learner
 	#[cfg(not(feature = "ddp"))]
 	let training = SupervisedTraining::new(artifact_dir, dataloader_train, dataloader_test)
@@ -97,6 +101,21 @@ pub fn train<B: AutodiffBackend, D: TextClassificationDataset + 'static>(
 		.metric_train_numeric(AccuracyMetric::new())
 		.metric_valid_numeric(AccuracyMetric::new())
 		.metric_train_numeric(LearningRateMetric::new())
+		.metric_train_numeric(precissionmetric.clone())
+		.metric_valid_numeric(precissionmetric.clone())
+		.metric_train_numeric(recallmetric.clone())
+		.metric_valid_numeric(recallmetric.clone())
+		.metric_train_numeric(f1metric.clone()) // F1 score
+		.metric_valid_numeric(f1metric.clone())
+		// .metric_train_numeric(TopKAccuracyMetric::new(5))
+		// .metric_valid_numeric(TopKAccuracyMetric::new(5))
+		// system / hardware
+		.metric_train_numeric(CpuUse::new())
+		.metric_valid_numeric(CpuUse::new())
+		.metric_train_numeric(CpuTemperature::new())
+		.metric_valid_numeric(CpuTemperature::new())
+		.metric_train_numeric(CpuMemory::new())
+		.metric_valid_numeric(CpuMemory::new())
 		.with_file_checkpointer(CompactRecorder::new())
 		.num_epochs(config.num_epochs)
 		.summary()
