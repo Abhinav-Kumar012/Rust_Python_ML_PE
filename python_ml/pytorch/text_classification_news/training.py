@@ -42,7 +42,11 @@ class TextClassificationModel(nn.Module):
             batch_first=True,
             norm_first=config.norm_first
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=config.num_layers)
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer, 
+            num_layers=config.num_layers,
+            norm=nn.LayerNorm(config.d_model) if config.norm_first else None
+        )
         
         # Output
         self.output = nn.Linear(config.d_model, config.num_classes)
