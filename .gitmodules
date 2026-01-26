@@ -1,0 +1,3 @@
+[submodule "burn"]
+	path = burn
+	url = https://github.com/tracel-ai/burn.git
