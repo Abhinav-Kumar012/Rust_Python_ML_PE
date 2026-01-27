@@ -105,9 +105,9 @@ class NoamLR(optim.lr_scheduler._LRScheduler):
         scale = self.factor * (self.model_size ** (-0.5)) * min(step ** (-0.5), step * self.warmup_steps ** (-1.5))
         return [scale for _ in self.base_lrs]
 
+tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
 def collate_fn(batch):
     # Batch is list of dicts: {'text': ..., 'label': ...}
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
     
     texts = [item['text'] for item in batch]
     labels = [item['label'] for item in batch]
@@ -139,7 +139,13 @@ def train():
     # Data
     print("Loading dataset...")
     # Using 'ag_news' from huggingface datasets
-    dataset = load_dataset("ag_news")
+    dataset = load_dataset(
+        "ag_news",
+        trust_remote_code=False,
+        download_mode="reuse_cache_if_exists",
+        verification_mode="no_checks",
+    )
+
     
     # Rust used a subset? "SamplerDataset::new(dataset_train, 50_000)"
     # ag_news train has 120k. Rust used 50k.
@@ -152,7 +158,7 @@ def train():
         batch_size=Config.batch_size, 
         shuffle=True, 
         collate_fn=collate_fn,
-        num_workers=0 # Simple for now
+        num_workers=4 # Simple for now
     )
     
     test_loader = DataLoader(
@@ -160,7 +166,7 @@ def train():
         batch_size=Config.batch_size, 
         shuffle=False, 
         collate_fn=collate_fn,
-        num_workers=0
+        num_workers=4
     )
     
     # Model
