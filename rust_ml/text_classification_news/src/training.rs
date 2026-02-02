@@ -26,7 +26,7 @@ use burn::{
 		metric::{
 			AccuracyMetric, ClassReduction, CpuMemory, CpuTemperature, CpuUse, CudaMetric,
 			FBetaScoreMetric, IterationSpeedMetric, LearningRateMetric, LossMetric,
-			PrecisionMetric, RecallMetric, TopKAccuracyMetric,
+			PrecisionMetric, RecallMetric,
 		},
 	},
 };
