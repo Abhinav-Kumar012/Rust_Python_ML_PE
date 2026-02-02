@@ -29,3 +29,5 @@ benchmark_logs
 python_ml/pytorch/mnist/Inference/model.pt
 
 MNIST
+
+artifacts
