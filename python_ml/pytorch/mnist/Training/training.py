@@ -13,6 +13,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import MNIST
 from torchvision import transforms
+from torch.utils.data import Subset
+
 
 from sklearn.metrics import (
     precision_score,
