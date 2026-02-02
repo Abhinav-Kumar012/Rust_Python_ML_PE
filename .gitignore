@@ -25,3 +25,7 @@ python_ml/benchmark/test_data
 # log files
 **/*.log
 benchmark_logs
+
+python_ml/pytorch/mnist/Inference/model.pt
+
+MNIST
