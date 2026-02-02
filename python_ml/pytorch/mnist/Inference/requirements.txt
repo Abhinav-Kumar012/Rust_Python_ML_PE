@@ -3,3 +3,5 @@ uvicorn==0.29.0
 torch==2.2.1
 torchvision==0.17.1
 numpy==1.26.4
+python-multipart==0.0.9
+
