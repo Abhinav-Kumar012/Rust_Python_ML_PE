@@ -76,11 +76,11 @@ pub fn infer<B: Backend, D: TextClassificationDataset + 'static>(
 		);
 	}
 }
-pub fn load_model<B,D>(
+pub fn load_model<B, D>(
 	artifact_dir: &str,
 	device: B::Device,
-) -> TextClassificationModel<B> 
-where 
+) -> TextClassificationModel<B>
+where
 	B: Backend,
 	D: TextClassificationDataset + 'static,
 {
@@ -109,7 +109,7 @@ pub fn make_batcher(artifact_dir: &str) -> TextClassificationBatcher {
 	return batcher;
 }
 pub fn infer_one<B, D>(
-	model: Arc<TextClassificationModel<B>>,
+	model: &TextClassificationModel<B>,
 	batcher: Arc<TextClassificationBatcher>,
 	device: B::Device,
 	sample: String,
