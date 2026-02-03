@@ -1,12 +1,8 @@
 # Build Stage
-FROM rust:1.92-alpine AS builder
+FROM rust:1.93-alpine AS builder
 
 WORKDIR /app/rust_ml
 
-# Disable rustup network access (CRITICAL)
-ENV RUSTUP_DIST_SERVER=disabled
-ENV RUSTUP_UPDATE_ROOT=disabled
-ENV RUSTUP_TOOLCHAIN=1.92.0
 # ENV CARGO_NET_OFFLINE=true
 
 # System deps

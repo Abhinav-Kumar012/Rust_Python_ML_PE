@@ -15,7 +15,7 @@ use axum::{
 	routing::post,
 };
 // use burn::backend::Cuda;
-use burn::backend::wgpu::Wgpu;
+use burn::backend::{NdArray};//, wgpu::Wgpu};
 use burn::tensor::backend::Backend;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
@@ -26,8 +26,8 @@ use crate::data::{AgNewsDataset, TextClassificationBatcher};
 use crate::model::TextClassificationModel;
 
 // Define the concrete backend type we want to use (WGPU)
-type MyBackend = Wgpu<f32, i32>;
-// type MyBackend = Cuda<f32, i32>;
+// type MyBackend = Wgpu<f32, i32>;
+type MyBackend = NdArray<f32, i32>;
 
 // --- App State ---
 struct AppState<B: Backend> {
