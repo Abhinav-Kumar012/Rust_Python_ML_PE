@@ -14,7 +14,6 @@ burn = { version = "~0.20", features = [
     "fusion",
     "std",
     "wgpu",
-    "cuda",
 ], default-features = false }
 log = { version = "0.4" }
 derive-new = "0.5"
