@@ -2,7 +2,7 @@ import time
 from locust import HttpUser, task, between
 from pathlib import Path
 from random import randint
-IMAGE_PATH = "test_data"
+IMAGE_PATH = "test_data/mnist"
 IP = "127.0.0.1"
 PORT = "9050"
 

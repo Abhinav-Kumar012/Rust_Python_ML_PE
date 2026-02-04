@@ -15,7 +15,7 @@ use axum::{
 	routing::post,
 };
 // use burn::backend::Cuda;
-use burn::backend::{NdArray};//, wgpu::Wgpu};
+use burn::backend::NdArray; //, wgpu::Wgpu};
 use burn::tensor::backend::Backend;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
@@ -66,7 +66,7 @@ async fn run_server<B: Backend>(device: B::Device) {
 	let art_dir = std::env::var("ARTIFACT_DIR")
 		.unwrap_or_else(|_| "./model/text_classification_ag_news_rust".to_string());
 
-	println!("Loading model from: {}", art_dir);
+	println!("Loading model from: {art_dir}");
 
 	// Load model
 	let model = crate::inference::load_model::<B, AgNewsDataset>(&art_dir, device.clone());
@@ -86,7 +86,7 @@ async fn run_server<B: Backend>(device: B::Device) {
 
 	let port = 9050;
 	let addr = SocketAddr::from(([0, 0, 0, 0], port));
-	println!("Listening on {}", addr);
+	println!("Listening on {addr}");
 
 	let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 	axum::serve(listener, app).await.unwrap();
