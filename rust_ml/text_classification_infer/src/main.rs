@@ -3,41 +3,109 @@ mod data;
 mod inference;
 mod model;
 mod training;
-type ElemType = f32;
-use crate::data::AgNewsDataset;
-use burn::tensor::backend::Backend;
-mod wgpu {
-	use crate::{ElemType, launch};
-	use burn::backend::wgpu::{Wgpu, WgpuDevice};
 
-	pub fn run() {
-		launch::<Wgpu<ElemType, i32>>(WgpuDevice::default());
-	}
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+use axum::{
+	Router,
+	extract::{Json, State},
+	response::IntoResponse,
+	routing::post,
+};
+// use burn::backend::Cuda;
+use burn::backend::NdArray; //, wgpu::Wgpu};
+use burn::tensor::backend::Backend;
+use serde::{Deserialize, Serialize};
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
+// use burn::tensor::backend::Backend;
+
+use crate::data::{AgNewsDataset, TextClassificationBatcher};
+use crate::model::TextClassificationModel;
+
+// Define the concrete backend type we want to use (WGPU)
+// type MyBackend = Wgpu<f32, i32>;
+type MyBackend = NdArray<f32, i32>;
+
+// --- App State ---
+struct AppState<B: Backend> {
+	// Wrap model in Mutex because Burn WGPU backend tensors might not be Sync (OnceCell)
+	model: Arc<Mutex<TextClassificationModel<B>>>,
+	batcher: Arc<TextClassificationBatcher>,
+	device: B::Device,
 }
-pub fn launch<B: Backend>(device: B::Device) {
+
+// --- Request/Response DTOs ---
+#[derive(Debug, Deserialize)]
+struct PredictRequest {
+	text: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PredictResponse {
+	text: String,
+	prediction: String,
+}
+
+// --- Main ---
+#[tokio::main]
+async fn main() {
+	// Initialize tracing
+	tracing_subscriber::fmt::init();
+
+	// Initialize WGPU Device
+	let device = <MyBackend as Backend>::Device::default();
+
+	// Start server
+	run_server::<MyBackend>(device).await;
+}
+
+async fn run_server<B: Backend>(device: B::Device) {
 	let art_dir = std::env::var("ARTIFACT_DIR")
-		.unwrap_or_else(|_| -> String { "./model/text_classification_ag_news_rust".to_string() });
-	crate::inference::infer::<B, AgNewsDataset>(
-	    device,
-	    &art_dir,
-	    // Samples from the test dataset, but you are free to test with your own text.
-	    vec![
-	        "Jays power up to take finale Contrary to popular belief, the power never really \
-	         snapped back at SkyDome on Sunday. The lights came on after an hour delay, but it \
-	         took some extra time for the batting orders to provide some extra wattage."
-	            .to_string(),
-	        "Yemen Sentences 15 Militants on Terror Charges A court in Yemen has sentenced one \
-	         man to death and 14 others to prison terms for a series of attacks and terrorist \
-	         plots in 2002, including the bombing of a French oil tanker."
-	            .to_string(),
-	        "IBM puts grids to work at U.S. Open IBM will put a collection of its On \
-	         Demand-related products and technologies to this test next week at the U.S. Open \
-	         tennis championships, implementing a grid-based infrastructure capable of running \
-	         multiple workloads including two not associated with the tournament."
-	            .to_string(),
-	    ],
-	);
+		.unwrap_or_else(|_| "./model/text_classification_ag_news_rust".to_string());
+
+	println!("Loading model from: {art_dir}");
+
+	// Load model
+	let model = crate::inference::load_model::<B, AgNewsDataset>(&art_dir, device.clone());
+	let batcher = crate::inference::make_batcher(&art_dir);
+
+	let shared_state = Arc::new(AppState {
+		model: Arc::new(Mutex::new(model)),
+		batcher: Arc::new(batcher),
+		device,
+	});
+
+	let app = Router::new()
+		.route("/predict", post(handle_predict))
+		.layer(CorsLayer::permissive())
+		.layer(TraceLayer::new_for_http())
+		.with_state(shared_state);
+
+	let port = 9050;
+	let addr = SocketAddr::from(([0, 0, 0, 0], port));
+	println!("Listening on {addr}");
+
+	let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+	axum::serve(listener, app).await.unwrap();
 }
-fn main() {
-	wgpu::run();
+
+// --- Handlers ---
+async fn handle_predict<B: Backend>(
+	State(state): State<Arc<AppState<B>>>,
+	Json(payload): Json<PredictRequest>,
+) -> impl IntoResponse {
+	// Lock the model execution
+	let model = state.model.lock().await;
+
+	let (text, prediction) = crate::inference::infer_one::<B, AgNewsDataset>(
+		&model,
+		state.batcher.clone(),
+		state.device.clone(),
+		payload.text,
+	);
+
+	Json(PredictResponse { text, prediction })
 }

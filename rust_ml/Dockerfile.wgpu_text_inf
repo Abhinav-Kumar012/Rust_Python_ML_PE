@@ -1,0 +1,47 @@
+# -----------------------
+# Build Stage
+# -----------------------
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
+
+WORKDIR /app/rust_ml
+
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+COPY . .
+
+RUN cargo build --release -p text_classification_infer
+
+# -----------------------
+# Runtime Stage
+# -----------------------
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    openssl \
+    libvulkan1 \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/rust_ml/target/release/text_classification_infer /app/binary
+
+COPY model/text_classification_ag_news_rust/config.json /app/model/text_class_rs/config.json
+COPY model/text_classification_ag_news_rust/model.mpk /app/model/text_class_rs/model.mpk
+
+ENV RUST_LOG=info
+ENV ARTIFACT_DIR=/app/model/text_class_rs
+
+EXPOSE 9050
+
+CMD ["./binary"]
