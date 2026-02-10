@@ -25,3 +25,6 @@ python_ml/benchmark/test_data
 # log files
 **/*.log
 benchmark_logs
+
+#env
+textclassifyenv/
