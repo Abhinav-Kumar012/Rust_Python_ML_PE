@@ -1,0 +1,26 @@
+FROM python:3.12-slim
+
+# Prevent Python cache + clean logs
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# External ML environment path (mounted at runtime)
+ENV PYTHONPATH=/external-libs/text_env/lib/python3.12/site-packages
+
+WORKDIR /app
+
+# Minimal system dependencies only
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application code
+COPY app.py ./
+
+# Copy model INSIDE container
+COPY model_pytorch_text_classification/ag_news_model.pth ./model/
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
