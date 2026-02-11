@@ -27,6 +27,7 @@ RUN cargo build --release -p text_classification_infer
 FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     openssl \
@@ -43,6 +44,9 @@ COPY model/text_classification_ag_news_rust/model.mpk /app/model/text_class_rs/m
 
 ENV RUST_LOG=info
 ENV ARTIFACT_DIR=/app/model/text_class_rs
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+ENV XDG_RUNTIME_DIR=/tmp
 
 EXPOSE 9050
 
