@@ -4,7 +4,7 @@
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
 WORKDIR /app/rust_ml
-
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
     curl \
@@ -26,12 +26,12 @@ RUN cargo build --release -p text_classification_infer
 # -----------------------
 FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
 
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     openssl \
     libvulkan1 \
     vulkan-tools \
-    nvidia-driver-535 \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
