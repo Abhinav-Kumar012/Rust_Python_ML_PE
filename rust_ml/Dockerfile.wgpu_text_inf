@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     ca-certificates \
+    vulkan-tools \
+    nvidia-driver-535 \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
