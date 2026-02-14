@@ -14,8 +14,7 @@ use burn::{
 	prelude::*,
 	record::{CompactRecorder, Recorder},
 };
-use serde::de;
-use std::{path::StripPrefixError, sync::Arc};
+use std::sync::Arc;
 
 // Define inference function
 pub fn infer<B: Backend, D: TextClassificationDataset + 'static>(
@@ -76,11 +75,11 @@ pub fn infer<B: Backend, D: TextClassificationDataset + 'static>(
 		);
 	}
 }
-pub fn load_model<B,D>(
+pub fn load_model<B, D>(
 	artifact_dir: &str,
 	device: B::Device,
-) -> TextClassificationModel<B> 
-where 
+) -> TextClassificationModel<B>
+where
 	B: Backend,
 	D: TextClassificationDataset + 'static,
 {
@@ -91,25 +90,25 @@ where
 		.expect("Trained model weights tb");
 	let n_classes = D::num_classes();
 	let tokenizer = Arc::new(BertCasedTokenizer::default());
-	let model = TextClassificationModelConfig::new(
+	// Initialize model with loaded weights
+	TextClassificationModelConfig::new(
 		config.transformer,
 		n_classes,
 		tokenizer.vocab_size(),
 		config.seq_length,
 	)
 	.init::<B>(&device)
-	.load_record(record); // Initialize model with loaded weights
-	return model;
+	.load_record(record)
 }
 pub fn make_batcher(artifact_dir: &str) -> TextClassificationBatcher {
 	let config = ExperimentConfig::load(format!("{artifact_dir}/config.json").as_str())
 		.expect("Config file present");
 	let tokenizer = Arc::new(BertCasedTokenizer::default());
-	let batcher = TextClassificationBatcher::new(tokenizer.clone(), config.seq_length);
-	return batcher;
+
+	TextClassificationBatcher::new(tokenizer.clone(), config.seq_length)
 }
 pub fn infer_one<B, D>(
-	model: Arc<TextClassificationModel<B>>,
+	model: &TextClassificationModel<B>,
 	batcher: Arc<TextClassificationBatcher>,
 	device: B::Device,
 	sample: String,
@@ -124,5 +123,5 @@ where
 	// let logits = prediction.to_data(); // Convert prediction tensor to data
 	let class_index = prediction.argmax(1).squeeze_dim::<1>(1).into_scalar(); // Get class index with the highest value
 	let class = D::class_name(class_index.elem::<i32>() as usize); // Get class name
-	return (sample.to_string(), class);
+	(sample.clone(), class)
 }
