@@ -7,7 +7,7 @@ use crate::training::ExperimentConfig;
 use burn::optim::decay::WeightDecayConfig;
 type Elem = f32;
 
-type MyBackend = burn::backend::Autodiff<burn::backend::wgpu::Wgpu<Elem, i32, u32>>;
+type MyBackend = burn::backend::Autodiff<burn::backend::wgpu::Wgpu<Elem>>;
 
 fn main() {
 	let config = ExperimentConfig::new(
@@ -17,7 +17,7 @@ fn main() {
 	);
 
 	crate::training::train::<MyBackend, DbPediaDataset>(
-		burn::backend::wgpu::WgpuDevice::default(),
+		Default::default(),
 		DbPediaDataset::train(),
 		DbPediaDataset::test(),
 		config,
