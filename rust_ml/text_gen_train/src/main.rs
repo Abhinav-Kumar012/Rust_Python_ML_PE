@@ -17,7 +17,7 @@ fn main() {
     );
 
     crate::training::train::<MyBackend, DbPediaDataset>(
-        MyBackend::default(),
+        burn::backend::wgpu::WgpuDevice::default(),
         DbPediaDataset::train(),
         DbPediaDataset::test(),
         config,
