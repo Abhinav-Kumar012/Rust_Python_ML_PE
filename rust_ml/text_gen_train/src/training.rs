@@ -15,7 +15,11 @@ use burn::{
     tensor::backend::AutodiffBackend,
     train::{
         Learner, SupervisedTraining,
-        metric::{AccuracyMetric, CudaMetric, LearningRateMetric, LossMetric, PerplexityMetric},
+        metric::{
+            AccuracyMetric, ClassReduction, CpuMemory, CpuTemperature, CpuUse, CudaMetric,
+			FBetaScoreMetric, IterationSpeedMetric, LearningRateMetric, LossMetric,
+			PrecisionMetric, RecallMetric,PerplexityMetric,
+        },
     },
 };
 use std::sync::Arc;
@@ -67,7 +71,9 @@ pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
         .with_model_size(config.transformer.d_model)
         .init()
         .unwrap();
-
+    let f1metric = FBetaScoreMetric::multiclass(1.0, 1, ClassReduction::Macro);
+	let precissionmetric = PrecisionMetric::multiclass(1, ClassReduction::Macro);
+	let recallmetric = RecallMetric::multiclass(1, ClassReduction::Macro);
     let training = SupervisedTraining::new(artifact_dir, dataloader_train, dataloader_test)
         .metric_train(CudaMetric::new())
         .metric_valid(CudaMetric::new())
@@ -77,7 +83,24 @@ pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
         .metric_valid_numeric(PerplexityMetric::new().with_pad_token(tokenizer.pad_token()))
         .metric_train(LossMetric::new())
         .metric_valid(LossMetric::new())
+        .metric_train(IterationSpeedMetric::new())
         .metric_train_numeric(LearningRateMetric::new())
+        .metric_train_numeric(precissionmetric.clone())
+		.metric_valid_numeric(precissionmetric.clone())
+		.metric_train_numeric(recallmetric.clone())
+		.metric_valid_numeric(recallmetric.clone())
+		.metric_train_numeric(f1metric.clone()) // F1 score
+		.metric_valid_numeric(f1metric.clone())
+		// .metric_train_numeric(TopKAccuracyMetric::new(5))
+		// .metric_valid_numeric(TopKAccuracyMetric::new(5))
+		// system / hardware
+		.metric_train_numeric(CpuUse::new())
+		.metric_valid_numeric(CpuUse::new())
+		.metric_train_numeric(CpuTemperature::new())
+		.metric_valid_numeric(CpuTemperature::new())
+		.metric_train_numeric(CpuMemory::new())
+		.metric_valid_numeric(CpuMemory::new())
+		.with_file_checkpointer(CompactRecorder::new())
         .with_file_checkpointer(CompactRecorder::new())
         .grads_accumulation(accum)
         .num_epochs(config.num_epochs)
