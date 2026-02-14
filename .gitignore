@@ -13,7 +13,8 @@ rust_ml/target/
 
 # model
 rust_ml/model/
-# model/
+model/
+python_ml/pytorch/text_classification_news/model_pytorch_text_classification/
 
 # mac files
 **/.DS_Store
