@@ -13,6 +13,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import MNIST
 from torchvision import transforms
+from torch.utils.data import Subset
+
 
 from sklearn.metrics import (
     precision_score,
@@ -27,8 +29,8 @@ from python_ml.pytorch.mnist.Training.data import (
 )
 from python_ml.pytorch.mnist.Training.model import Model
 
-
-ARTIFACT_DIR = "/tmp/burn_python_mnist"
+# Store model in this directory
+ARTIFACT_DIR = "./artifacts/pytorch_mnist_pt"
 
 
 def normalize(x):

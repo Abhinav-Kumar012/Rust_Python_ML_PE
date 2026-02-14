@@ -14,6 +14,7 @@ rust_ml/target/
 # model
 rust_ml/model/
 model/
+python_ml/pytorch/text_classification_news/model_pytorch_text_classification/
 
 # mac files
 **/.DS_Store
@@ -25,3 +26,6 @@ python_ml/benchmark/test_data
 # log files
 **/*.log
 benchmark_logs
+
+#env
+textclassifyenv/
