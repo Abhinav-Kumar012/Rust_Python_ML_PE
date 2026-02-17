@@ -154,7 +154,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # Create checkpoints directory
-    artifact_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "checkpoints")
+    # Save models in the same directory as this file
+    artifact_dir = os.path.dirname(os.path.abspath(__file__))
     
     train(device, artifact_dir)
