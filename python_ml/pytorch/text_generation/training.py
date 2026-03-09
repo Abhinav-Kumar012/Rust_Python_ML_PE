@@ -61,28 +61,31 @@ def train(device, artifact_dir):
     
     collate_fn = CollateFn(data_handler.tokenizer, config.max_seq_length)
     
-    # Rust uses num_workers=4
+    # Rust uses num_workers=4, and samples datasets per epoch
+    train_sampler = torch.utils.data.RandomSampler(train_dataset, num_samples=10000, replacement=True)
+    test_sampler = torch.utils.data.RandomSampler(test_dataset, num_samples=1000, replacement=True)
+    
     train_loader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 
-        shuffle=True, 
+        sampler=train_sampler,
         collate_fn=collate_fn, 
-        num_workers=0 # Set to 0 for Windows compatibility/debugging, or 4 if robust
+        num_workers=4
     )
     test_loader = DataLoader(
         test_dataset, 
         batch_size=batch_size, 
-        shuffle=False, 
+        sampler=test_sampler,
         collate_fn=collate_fn, 
-        num_workers=0
+        num_workers=4
     )
     
     # Model Setup
     model = TextGenerationModel(config).to(device)
     
-    # Optimizer (AdamW with weight decay 1e-6)
-    # Rust: AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(1.0e-6)))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0, weight_decay=1.0e-6)
+    # Optimizer 
+    # Rust uses default AdamConfig which has no weight decay
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
     
     # Scheduler
     # Rust: NoamLrSchedulerConfig::new(0.01 / accum as f64).with_warmup_steps(6000)
