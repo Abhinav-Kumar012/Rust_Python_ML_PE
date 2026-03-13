@@ -44,7 +44,7 @@ def train(device, artifact_dir):
     )
     
     batch_size = 6
-    num_epochs = 50
+    num_epochs = 5
     gradient_accumulation_steps = 6
     
     print("Loading data...")
