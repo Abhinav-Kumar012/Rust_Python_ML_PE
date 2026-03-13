@@ -106,7 +106,7 @@ pub fn train<B: AutodiffBackend, D: Dataset<TextGenerationItem> + 'static>(
 		.num_epochs(config.num_epochs)
 		.summary();
 
-	let result = training.launch(Learner::new(model, optim, lr_scheduler));
+	let result = training.launch(Learner::new(model, optim, lr_scheduler).devices(vec![device.clone()]));
 
 	config.save(format!("{artifact_dir}/config.json")).unwrap();
 
