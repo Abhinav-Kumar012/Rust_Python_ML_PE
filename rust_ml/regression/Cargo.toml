@@ -1,0 +1,14 @@
+[package]
+name = "regression"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+burn = { version = "~0.20", features=["train","wgpu","tui"]}
+log = { version = "0.4" }
+serde = { version = "1.0.228", features = ["std", "derive"] }
+textplots = "0.8.7"
+rgb = "0.8.52"
+[lints]
+workspace = true
