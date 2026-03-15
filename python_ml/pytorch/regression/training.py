@@ -23,31 +23,35 @@ RAW_DATA_FILE = "boston_housing.npz"
 TRAIN_FILE = "train_data.npz"
 VALID_FILE = "valid_data.npz"
 
+
 # ==========================================================
-# Dataset Download + Preparation
+# Dataset preparation
 # ==========================================================
 
 def prepare_dataset():
 
-    # Download raw dataset if missing
     if not os.path.exists(RAW_DATA_FILE):
         print("Downloading Boston Housing dataset...")
         urllib.request.urlretrieve(DATASET_URL, RAW_DATA_FILE)
         print("Download complete.")
 
-    # Convert to train/valid npz if missing
     if not os.path.exists(TRAIN_FILE) or not os.path.exists(VALID_FILE):
 
         data = np.load(RAW_DATA_FILE)
 
-        x_train = data["x_train"]
-        y_train = data["y_train"]
+        X = data["x"]
+        y = data["y"]
 
-        x_test = data["x_test"]
-        y_test = data["y_test"]
+        split = int(0.8 * len(X))
 
-        np.savez(TRAIN_FILE, x=x_train, y=y_train)
-        np.savez(VALID_FILE, x=x_test, y=y_test)
+        X_train = X[:split]
+        y_train = y[:split]
+
+        X_valid = X[split:]
+        y_valid = y[split:]
+
+        np.savez(TRAIN_FILE, x=X_train, y=y_train)
+        np.savez(VALID_FILE, x=X_valid, y=y_valid)
 
         print("Dataset prepared.")
 
@@ -97,9 +101,9 @@ class RegressionModel(nn.Module):
 
         super().__init__()
 
-        self.input_layer = nn.Linear(NUM_FEATURES, hidden_size)
+        self.input_layer = nn.Linear(NUM_FEATURES, hidden_size, bias=True)
         self.activation = nn.ReLU()
-        self.output_layer = nn.Linear(hidden_size, 1)
+        self.output_layer = nn.Linear(hidden_size, 1, bias=True)
 
     def forward(self, x):
 
@@ -130,10 +134,9 @@ class ExpConfig:
 
 def create_artifact_dir(artifact_dir):
 
-    if os.path.exists(artifact_dir):
-        shutil.rmtree(artifact_dir)
+    shutil.rmtree(artifact_dir, ignore_errors=True)
 
-    os.makedirs(artifact_dir)
+    os.makedirs(artifact_dir, exist_ok=True)
 
 
 def set_seed(seed):
@@ -172,7 +175,7 @@ def train_epoch(model, dataloader, optimizer, device):
 
     total_loss = 0
 
-    start = time.time()
+    start_time = time.time()
 
     for inputs, targets in dataloader:
 
@@ -191,9 +194,9 @@ def train_epoch(model, dataloader, optimizer, device):
 
         total_loss += loss.item()
 
-    end = time.time()
+    end_time = time.time()
 
-    iteration_speed = len(dataloader) / (end - start)
+    iteration_speed = len(dataloader) / (end_time - start_time)
 
     cpu_use, cpu_temp, cpu_mem = cpu_metrics()
 
@@ -238,10 +241,10 @@ def validate_epoch(model, dataloader, device):
 
 
 # ==========================================================
-# Run
+# Run (Equivalent to Rust run())
 # ==========================================================
 
-def run(artifact_dir="artifacts", device="cpu"):
+def run(artifact_dir, device):
 
     device = torch.device(device)
 
@@ -267,7 +270,7 @@ def run(artifact_dir="artifacts", device="cpu"):
     valid_loader = DataLoader(
         valid_dataset,
         batch_size=config.batch_size,
-        shuffle=False,
+        shuffle=True,
         num_workers=config.num_workers
     )
 
@@ -302,27 +305,23 @@ def run(artifact_dir="artifacts", device="cpu"):
         history.append(metrics)
 
         print(
-            f"Epoch {epoch+1}/{config.num_epochs} | "
-            f"Train Loss: {metrics['train_loss']:.6f} | "
+            f"Epoch {epoch+1}/{config.num_epochs} "
+            f"Train Loss: {metrics['train_loss']:.6f} "
             f"Valid Loss: {metrics['valid_loss']:.6f}"
         )
 
-    # Save config
     with open(os.path.join(artifact_dir, "config.json"), "w") as f:
         json.dump(config.__dict__, f, indent=4)
 
-    # Save metrics
     with open(os.path.join(artifact_dir, "metrics.json"), "w") as f:
         json.dump(history, f, indent=4)
 
-    # Save model
     torch.save(
         model.state_dict(),
         os.path.join(artifact_dir, "model.pt")
     )
 
-    print("\nTraining complete.")
-    print("Artifacts saved to:", artifact_dir)
+    print("Training complete. Artifacts saved to:", artifact_dir)
 
 
 # ==========================================================
