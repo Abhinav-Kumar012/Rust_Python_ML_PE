@@ -3,20 +3,53 @@ import json
 import shutil
 import time
 import random
+import urllib.request
 import psutil
 import torch
 import numpy as np
 from dataclasses import dataclass
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-from typing import Tuple
-
 
 # ==========================================================
-# Constants (matches NUM_FEATURES from Rust dataset)
+# Constants
 # ==========================================================
 
 NUM_FEATURES = 13
+
+DATASET_URL = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/boston_housing.npz"
+RAW_DATA_FILE = "boston_housing.npz"
+
+TRAIN_FILE = "train_data.npz"
+VALID_FILE = "valid_data.npz"
+
+# ==========================================================
+# Dataset Download + Preparation
+# ==========================================================
+
+def prepare_dataset():
+
+    # Download raw dataset if missing
+    if not os.path.exists(RAW_DATA_FILE):
+        print("Downloading Boston Housing dataset...")
+        urllib.request.urlretrieve(DATASET_URL, RAW_DATA_FILE)
+        print("Download complete.")
+
+    # Convert to train/valid npz if missing
+    if not os.path.exists(TRAIN_FILE) or not os.path.exists(VALID_FILE):
+
+        data = np.load(RAW_DATA_FILE)
+
+        x_train = data["x_train"]
+        y_train = data["y_train"]
+
+        x_test = data["x_test"]
+        y_test = data["y_test"]
+
+        np.savez(TRAIN_FILE, x=x_train, y=y_train)
+        np.savez(VALID_FILE, x=x_test, y=y_test)
+
+        print("Dataset prepared.")
 
 
 # ==========================================================
@@ -37,12 +70,20 @@ class HousingDataset(Dataset):
 
     @staticmethod
     def train():
-        data = np.load("train_data.npz")
+
+        prepare_dataset()
+
+        data = np.load(TRAIN_FILE)
+
         return HousingDataset(data["x"], data["y"])
 
     @staticmethod
     def validation():
-        data = np.load("valid_data.npz")
+
+        prepare_dataset()
+
+        data = np.load(VALID_FILE)
+
         return HousingDataset(data["x"], data["y"])
 
 
@@ -52,17 +93,20 @@ class HousingDataset(Dataset):
 
 class RegressionModel(nn.Module):
 
-    def __init__(self, hidden_size: int = 64):
+    def __init__(self, hidden_size=64):
+
         super().__init__()
 
-        self.input_layer = nn.Linear(NUM_FEATURES, hidden_size, bias=True)
+        self.input_layer = nn.Linear(NUM_FEATURES, hidden_size)
         self.activation = nn.ReLU()
-        self.output_layer = nn.Linear(hidden_size, 1, bias=True)
+        self.output_layer = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
+
         x = self.input_layer(x)
         x = self.activation(x)
         x = self.output_layer(x)
+
         return x
 
 
@@ -84,7 +128,7 @@ class ExpConfig:
 # Utilities
 # ==========================================================
 
-def create_artifact_dir(artifact_dir: str):
+def create_artifact_dir(artifact_dir):
 
     if os.path.exists(artifact_dir):
         shutil.rmtree(artifact_dir)
@@ -92,7 +136,7 @@ def create_artifact_dir(artifact_dir: str):
     os.makedirs(artifact_dir)
 
 
-def set_seed(seed: int):
+def set_seed(seed):
 
     random.seed(seed)
     np.random.seed(seed)
@@ -108,8 +152,8 @@ def cpu_metrics():
     memory = process.memory_info().rss / (1024 ** 2)
 
     try:
-        temp = psutil.sensors_temperatures()
-        cpu_temp = list(temp.values())[0][0].current
+        temps = psutil.sensors_temperatures()
+        cpu_temp = list(temps.values())[0][0].current
     except:
         cpu_temp = 0.0
 
@@ -127,7 +171,8 @@ def train_epoch(model, dataloader, optimizer, device):
     mse = nn.MSELoss()
 
     total_loss = 0
-    start_time = time.time()
+
+    start = time.time()
 
     for inputs, targets in dataloader:
 
@@ -146,9 +191,9 @@ def train_epoch(model, dataloader, optimizer, device):
 
         total_loss += loss.item()
 
-    end_time = time.time()
+    end = time.time()
 
-    iteration_speed = len(dataloader) / (end_time - start_time)
+    iteration_speed = len(dataloader) / (end - start)
 
     cpu_use, cpu_temp, cpu_mem = cpu_metrics()
 
@@ -193,10 +238,10 @@ def validate_epoch(model, dataloader, device):
 
 
 # ==========================================================
-# Run (Equivalent to Rust `run`)
+# Run
 # ==========================================================
 
-def run(artifact_dir: str, device: str = "cpu"):
+def run(artifact_dir="artifacts", device="cpu"):
 
     device = torch.device(device)
 
@@ -206,7 +251,6 @@ def run(artifact_dir: str, device: str = "cpu"):
 
     set_seed(config.seed)
 
-    # Dataset
     train_dataset = HousingDataset.train()
     valid_dataset = HousingDataset.validation()
 
@@ -227,7 +271,6 @@ def run(artifact_dir: str, device: str = "cpu"):
         num_workers=config.num_workers
     )
 
-    # Model
     model = RegressionModel().to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
@@ -259,8 +302,8 @@ def run(artifact_dir: str, device: str = "cpu"):
         history.append(metrics)
 
         print(
-            f"Epoch {epoch+1}/{config.num_epochs} "
-            f"Train Loss: {metrics['train_loss']:.6f} "
+            f"Epoch {epoch+1}/{config.num_epochs} | "
+            f"Train Loss: {metrics['train_loss']:.6f} | "
             f"Valid Loss: {metrics['valid_loss']:.6f}"
         )
 
@@ -278,7 +321,8 @@ def run(artifact_dir: str, device: str = "cpu"):
         os.path.join(artifact_dir, "model.pt")
     )
 
-    print("Training complete. Artifacts saved to:", artifact_dir)
+    print("\nTraining complete.")
+    print("Artifacts saved to:", artifact_dir)
 
 
 # ==========================================================
