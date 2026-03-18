@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::model::{Model, ModelConfig};
 
-pub type Backend = Wgpu<f32>;
+pub type Backend = Wgpu<f32,i32,u32>;
 
 #[derive(Clone)]
 pub struct AppState {
