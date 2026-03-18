@@ -8,6 +8,7 @@ burn = { version = "~0.19", features = [
     "std",
     "ndarray",
     "store",
+    "wgpu",
 ], default-features = false }
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }

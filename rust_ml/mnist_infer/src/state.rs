@@ -1,11 +1,12 @@
-use burn::backend::ndarray::{NdArray, NdArrayDevice};
+use burn::backend::Wgpu;
+// use burn::backend::ndarray::{NdArray, NdArrayDevice};
 use burn::module::Module;
 use burn::record::CompactRecorder;
 use std::sync::{Arc, Mutex};
 
 use crate::model::{Model, ModelConfig};
 
-pub type Backend = NdArray<f32>;
+pub type Backend = Wgpu<f32>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -17,7 +18,7 @@ pub struct AppState {
 
 impl AppState {
 	pub fn new(model_path: &str) -> Self {
-		let device = NdArrayDevice::Cpu;
+		let device = Default::default();
 
 		// Initialize a default model first
 		let config = ModelConfig::new(10, 512); // Defaults from training
