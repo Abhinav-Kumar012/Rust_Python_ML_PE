@@ -130,12 +130,12 @@ pub async fn predict_handler(
 	};
 
 	// Log to stdout (JSON structured log)
-	let log_entry = serde_json::json!({
-		"event": "inference_complete",
-		"prediction": prediction,
-		"metrics": metrics
-	});
-	println!("{log_entry}");
+	// let log_entry = serde_json::json!({
+		// "event": "inference_complete",
+		// "prediction": prediction,
+		// "metrics": metrics
+	// });
+	// println!("{log_entry}");
 
 	Ok(Json(InferenceResponse {
 		prediction,
