@@ -29,3 +29,7 @@ benchmark_logs
 
 #env
 textclassifyenv/
+
+MNIST
+
+model.pt
