@@ -14,21 +14,20 @@
 #                                      └────────────────────────────────────┘
 #
 # The Docker image contains ONLY:
-#   • python:3.11-slim base (~50 MB)
-#   • libgomp1  (runtime dependency of libtorch's C++ backend)
+#   • nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 base (CUDA runtime + cuDNN)
+#   • Python 3.11  (installed via apt)
 #   • Application source code
 #
-# Heavy Python libraries (torch, numpy, …) reside on the NFS server and are
-# injected at runtime via a bind-mount + PYTHONPATH.
-# Result: image shrinks from ~200 MB → ~80 MB; rebuilding the image never
-# requires re-downloading PyTorch.
+# Heavy Python libraries (torch-cu121, numpy, …) reside on the NFS server and
+# are injected at runtime via a bind-mount + PYTHONPATH.
+# Result: image stays lean; rebuilding never requires re-downloading PyTorch.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # PRE-REQUISITES  (run once on the NFS server):
 #
 #   pip install \
 #     --target /srv/lstm-libs \
-#     --index-url https://download.pytorch.org/whl/cpu \
+#     --index-url https://download.pytorch.org/whl/cu121 \
 #     torch numpy
 #
 # On the Docker host, mount the NFS export before running the container:
@@ -43,9 +42,9 @@
 #     -t lstm-inference:latest \
 #     .
 #
-# RUN:
+# RUN  (requires nvidia-container-toolkit on the host):
 #
-#   docker run --rm \
+#   docker run --rm --gpus all \
 #     -v /mnt/lstm-libs:/external-libs:ro \
 #     -v /mnt/lstm-models/lstm_train_python:/app/model/lstm_train_python:ro \
 #     -e PYTHONPATH=/external-libs \
@@ -54,17 +53,28 @@
 #
 # =============================================================================
 
-# Single lightweight stage — no pip installs of heavy packages.
+# Single stage — no pip installs of heavy packages.
 # IMPORTANT: Python version here MUST match the version used on the NFS server
 # when running `pip install --target`.  A mismatch causes ImportError at runtime.
-FROM python:3.11-slim
+#
+# Base image: NVIDIA CUDA 12.1 runtime + cuDNN 8.
+# This provides all CUDA shared libraries that torch-cu121 needs at runtime
+# (libcuda.so, libcudnn.so, etc.) without baking torch itself into the image.
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 WORKDIR /app
 
-# libgomp1 is required by libtorch (PyTorch's C++ backend) at runtime.
-# This is the only system-level dependency the image adds beyond the base.
+# Install Python 3.11.  The CUDA base is Ubuntu 22.04 which ships Python 3.10;
+# we add the deadsnakes PPA to get 3.11 and match the NFS library environment.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 \
+ && apt-get install -y --no-install-recommends \
+        software-properties-common \
+ && add-apt-repository ppa:deadsnakes/ppa \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        python3.11 python3.11-distutils python3-pip \
+ && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
+ && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
  && rm -rf /var/lib/apt/lists/*
 
 # ── Application source code ───────────────────────────────────────────────────
