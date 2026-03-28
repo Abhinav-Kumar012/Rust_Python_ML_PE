@@ -1,0 +1,21 @@
+[package]
+name = "lstm_train"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+burn = { version = "~0.20", features = [
+    "train",
+    "tui",
+    "autotune",
+    "fusion",
+    "std",
+    "wgpu",
+], default-features = false }
+rand = { version = "0.9.2", default-features = false, features = ["thread_rng"] }
+rand_distr = { version = "0.5.1", default-features = false }
+serde = { version = "1.0.228", features = ["std", "derive"] }
+planus = { version = "=1.1" }
+polars = { version = "0.51.0", features = ["lazy"] }
+[lints]
+workspace = true
