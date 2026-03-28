@@ -33,3 +33,5 @@ textclassifyenv/
 MNIST
 
 model.pt
+
+python_ml/pytorch/text_classification_news/Inference/model_pytorch_text_classification/ag_news_model.pth
