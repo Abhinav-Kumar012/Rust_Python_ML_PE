@@ -21,7 +21,11 @@ RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu121 \
     -r requirements.docker.txt
 
-COPY . .
+# Copy application code
+COPY app.py ./
+
+# Copy model INSIDE container (from generated/ output dir)
+COPY generated/model.pt ./generated/model.pt
 
 EXPOSE 8000
 

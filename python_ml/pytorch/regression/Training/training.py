@@ -17,11 +17,13 @@ from torch.utils.data import Dataset, DataLoader
 
 NUM_FEATURES = 13
 
-DATASET_URL = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/boston_housing.npz"
-RAW_DATA_FILE = "boston_housing.npz"
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated")
 
-TRAIN_FILE = "train_data.npz"
-VALID_FILE = "valid_data.npz"
+DATASET_URL = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/boston_housing.npz"
+RAW_DATA_FILE = os.path.join(OUTPUT_DIR, "boston_housing.npz")
+
+TRAIN_FILE = os.path.join(OUTPUT_DIR, "train_data.npz")
+VALID_FILE = os.path.join(OUTPUT_DIR, "valid_data.npz")
 
 
 # ==========================================================
@@ -29,6 +31,8 @@ VALID_FILE = "valid_data.npz"
 # ==========================================================
 
 def prepare_dataset():
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     if not os.path.exists(RAW_DATA_FILE):
         print("Downloading Boston Housing dataset...")
@@ -316,9 +320,12 @@ def run(artifact_dir, device):
     with open(os.path.join(artifact_dir, "metrics.json"), "w") as f:
         json.dump(history, f, indent=4)
 
+    model_dir = os.path.join(artifact_dir, "model_pytorch_regression")
+    os.makedirs(model_dir, exist_ok=True)
+
     torch.save(
         model.state_dict(),
-        os.path.join(artifact_dir, "model.pt")
+        os.path.join(model_dir, "ag_news_model.pth")
     )
 
     print("Training complete. Artifacts saved to:", artifact_dir)
@@ -331,6 +338,6 @@ def run(artifact_dir, device):
 if __name__ == "__main__":
 
     run(
-        artifact_dir="artifacts",
+        artifact_dir=os.path.join(OUTPUT_DIR, "artifacts"),
         device="cuda" if torch.cuda.is_available() else "cpu"
     )
