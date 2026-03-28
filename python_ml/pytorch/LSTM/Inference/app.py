@@ -1,14 +1,18 @@
 import os
+import sys
 import json
 import torch
 from torch.utils.data import DataLoader
 
-from .dataset import (
+# Add parent (LSTM/) to sys.path so shared modules are importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dataset import (
     NUM_SEQUENCES, SEQ_LENGTH, NOISE_LEVEL,
     SequenceDataset, collate_fn,
 )
-from .model import LstmNetwork
-from .training import TrainingConfig
+from model import LstmNetwork
+from config import TrainingConfig
 
 
 # ==========================================================

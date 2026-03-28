@@ -1,6 +1,0 @@
-# CPU-only PyTorch — install via the --index-url below (see Dockerfile)
-# torch is listed separately so the Dockerfile installs it from the PyTorch wheel index.
-torch
-
-# Core numerics
-numpy

@@ -1,39 +1,23 @@
 import os
+import sys
 import json
 import shutil
 import random
 import numpy as np
 import torch
 import torch.nn as nn
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from torch.utils.data import DataLoader
 
-from .dataset import (
-    NUM_SEQUENCES, SEQ_LENGTH, NOISE_LEVEL, RANDOM_SEED,
+# Add parent (LSTM/) to sys.path so shared modules are importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dataset import (
+    NUM_SEQUENCES, SEQ_LENGTH, NOISE_LEVEL,
     SequenceDataset, collate_fn,
 )
-from .model import LstmNetwork
-
-
-# ==========================================================
-# TrainingConfig  (mirrors training.rs TrainingConfig)
-# ==========================================================
-
-@dataclass
-class TrainingConfig:
-    num_epochs: int   = 30
-    batch_size: int   = 32
-    num_workers: int  = 2
-    lr: float         = 1e-3
-    seed: int         = RANDOM_SEED
-
-    # Model hyper-parameters (mirrors LstmNetworkConfig defaults)
-    input_size: int   = 1
-    hidden_size: int  = 32
-    num_layers: int   = 2
-    output_size: int  = 1
-    dropout: float    = 0.1
-    bidirectional: bool = True
+from model import LstmNetwork
+from config import TrainingConfig
 
 
 # ==========================================================
