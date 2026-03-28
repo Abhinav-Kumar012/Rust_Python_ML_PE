@@ -1,3 +1,4 @@
+import os
 import time
 import torch
 import numpy as np
@@ -11,6 +12,8 @@ from torch import nn
 # ==========================================================
 
 NUM_FEATURES = 13
+
+GENERATED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated")
 
 # ==========================================================
 # Model Definition (same as training)
@@ -55,7 +58,7 @@ torch.set_num_interop_threads(1)
 
 model = RegressionModel()
 
-state_dict = torch.load("model.pt", map_location=device)
+state_dict = torch.load(os.path.join(GENERATED_DIR, "model.pt"), map_location=device)
 
 model.load_state_dict(state_dict)
 
