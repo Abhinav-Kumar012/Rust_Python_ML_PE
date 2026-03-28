@@ -19,7 +19,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 COPY . .
 
-RUN cargo build --release -p text_classification_infer
+RUN cargo build --release -p mnist_infer
 
 # -----------------------
 # Runtime Stage
@@ -33,13 +33,12 @@ FROM nvidia/vulkan:1.3-470
 
 WORKDIR /app
 
-COPY --from=builder /app/rust_ml/target/release/text_classification_infer /app/binary
+COPY --from=builder /app/rust_ml/target/release/mnist_infer /app/binary
 
-COPY model/text_classification_ag_news_rust/config.json /app/model/text_class_rs/config.json
-COPY model/text_classification_ag_news_rust/model.mpk /app/model/text_class_rs/model.mpk
+COPY ./model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
 
 ENV RUST_LOG=info
-ENV ARTIFACT_DIR=/app/model/text_class_rs
+ENV MODEL_PATH=/app/model/mnist_rust/model.mpk
 
 EXPOSE 9050
 
