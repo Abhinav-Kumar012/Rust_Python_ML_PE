@@ -4,11 +4,10 @@ use axum::{
 	Json,
 };
 use burn::data::dataloader::batcher::Batcher;
-use burn::tensor::Data;
 use regression::dataset::{HousingBatcher, HousingDistrictItem};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use crate::state::AppState;
+use crate::state::{AppState, Backend};
 
 #[derive(Serialize)]
 pub struct PredictResponse {
@@ -24,10 +23,10 @@ pub async fn predict_handler(
 	State(state): State<AppState>,
 	Json(payload): Json<HousingDistrictItem>,
 ) -> Result<Json<PredictResponse>, (StatusCode, Json<ErrorResponse>)> {
-	let device = Default::default();
+	let device: <Backend as burn::tensor::backend::Backend>::Device = Default::default();
 
-	// Create batcher
-	let batcher = HousingBatcher::new(device.clone());
+	// Create batcher mapped to backend
+	let batcher = HousingBatcher::<Backend>::new(device.clone());
 
 	// Process item
 	// Note: HousingBatcher::batch transforms a Vec<Item> into a HousingBatch
