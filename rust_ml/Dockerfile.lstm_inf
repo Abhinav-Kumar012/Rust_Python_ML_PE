@@ -1,0 +1,31 @@
+# Build Stage
+FROM rust:1.92-alpine as builder
+
+WORKDIR /app
+WORKDIR /app/rust_ml
+
+# Copy workspace
+COPY . /app/rust_ml/
+
+# Build the release binary for lstm_inference
+RUN cargo build --release -p lstm_inference
+
+# Runtime Stage
+FROM alpine:3.23
+
+# Install ca-certificates and openssl
+RUN apk add --no-cache openssl-dev ca-certificates
+
+WORKDIR /app
+
+# Copy compiled binary from builder
+COPY --from=builder /app/rust_ml/target/release/lstm_inference /app/lstm_inference
+
+# Environment variables
+ENV RUST_LOG=info
+# Setup the default mounted model path
+ENV MODEL_DIR=/app/model/lstm_train_rust
+
+EXPOSE 9070
+
+CMD ["./lstm_inference"]
