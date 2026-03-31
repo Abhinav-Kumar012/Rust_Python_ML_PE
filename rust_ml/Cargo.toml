@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["lstm_train","mnist_infer","mnist_ml", "regression", "text_classification_infer", "text_classification_news", "text_gen_train"]
+members = ["lstm_train","mnist_infer","mnist_ml", "regression", "regression_inference", "text_classification_infer", "text_classification_news", "text_gen_train"]
 
 [workspace.lints.clippy]
 all = "warn"

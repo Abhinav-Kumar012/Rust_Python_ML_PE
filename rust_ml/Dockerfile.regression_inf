@@ -1,0 +1,32 @@
+# Build Stage
+FROM rust:1.92-alpine as builder
+
+WORKDIR /app
+WORKDIR /app/rust_ml
+
+# Copy workspace
+# This assumes the build context is the `rust_ml` root directory.
+COPY . /app/rust_ml/
+
+# Build the release binary for regression_inference
+RUN cargo build --release -p regression_inference
+
+# Runtime Stage
+FROM alpine:3.23
+
+# Install ca-certificates and openssl in case axum needs them
+RUN apk add --no-cache openssl-dev ca-certificates
+
+WORKDIR /app
+
+# Copy compiled binary from builder
+COPY --from=builder /app/rust_ml/target/release/regression_inference /app/regression_inference
+
+# Environment variables
+ENV RUST_LOG=info
+# Setup the default mounted model path
+ENV MODEL_PATH=/app/model/regression_rust/model
+
+EXPOSE 9060
+
+CMD ["./regression_inference"]
