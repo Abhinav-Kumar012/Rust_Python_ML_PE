@@ -21,15 +21,21 @@ pub struct ErrorResponse {
 
 pub async fn predict_handler(
 	State(state): State<AppState>,
-	Json(payload): Json<SequenceDatasetItem>,
+	Json(payload): Json<Vec<f32>>,
 ) -> Result<Json<PredictResponse>, (StatusCode, Json<ErrorResponse>)> {
 	let device: <MyBackend as burn::tensor::backend::Backend>::Device = Default::default();
+
+	// Explicitly construct the dataset mapping bypassing manual target generation for clients
+	let item = SequenceDatasetItem {
+		sequence: payload,
+		target: 0.0,
+	};
 
 	// Create batcher mapped to backend
 	let batcher = SequenceBatcher::default();
 
 	// Process item into batched tensors
-	let batch = batcher.batch(vec![payload], &device);
+	let batch = batcher.batch(vec![item], &device);
 
 	// Perform forward pass inference
 	let output = state.model.lock().unwrap().forward(batch.sequences, None);
