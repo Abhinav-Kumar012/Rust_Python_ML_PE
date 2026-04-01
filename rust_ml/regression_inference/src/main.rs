@@ -1,4 +1,5 @@
 mod inference;
+mod model;
 mod state;
 
 use axum::{

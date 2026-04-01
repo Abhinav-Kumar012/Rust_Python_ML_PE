@@ -1,12 +1,12 @@
 use burn::{
-	backend::NdArray,
+	backend::Wgpu,
 	module::Module,
 	record::{NoStdTrainingRecorder, Recorder},
 };
-use regression::model::{RegressionModel, RegressionModelConfig, RegressionModelRecord};
+use crate::model::{RegressionModel, RegressionModelConfig, RegressionModelRecord};
 use std::sync::{Arc, Mutex};
 
-pub type Backend = NdArray;
+pub type Backend = Wgpu;
 
 #[derive(Clone)]
 pub struct AppState {
