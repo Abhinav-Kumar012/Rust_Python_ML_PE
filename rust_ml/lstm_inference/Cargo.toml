@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 lstm_train = { path = "../lstm_train" }
-burn = { version = "~0.20", features = ["std", "ndarray"], default-features = false }
+burn = { version = "~0.20", features = ["std", "wgpu"], default-features = false }
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

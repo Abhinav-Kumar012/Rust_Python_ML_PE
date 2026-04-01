@@ -1,4 +1,6 @@
+#![recursion_limit = "256"]
 mod inference;
+mod model;
 mod state;
 
 use axum::{

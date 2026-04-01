@@ -7,7 +7,7 @@ use burn::data::dataloader::batcher::Batcher;
 use lstm_train::dataset::{SequenceBatcher, SequenceDatasetItem};
 use serde::Serialize;
 
-use crate::state::{AppState, Backend};
+use crate::state::{AppState, MyBackend};
 
 #[derive(Serialize)]
 pub struct PredictResponse {
@@ -23,7 +23,7 @@ pub async fn predict_handler(
 	State(state): State<AppState>,
 	Json(payload): Json<SequenceDatasetItem>,
 ) -> Result<Json<PredictResponse>, (StatusCode, Json<ErrorResponse>)> {
-	let device: <Backend as burn::tensor::backend::Backend>::Device = Default::default();
+	let device: <MyBackend as burn::tensor::backend::Backend>::Device = Default::default();
 
 	// Create batcher mapped to backend
 	let batcher = SequenceBatcher::default();
