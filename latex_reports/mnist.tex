@@ -1,0 +1,292 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{float} 
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstdefinelanguage{Dockerfile}{
+  keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
+  sensitive=true,
+  comment=[l]{\#},
+  morestring=[b]",
+}
+
+\title{\textbf{MNIST}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Architecture Details}
+
+\begin{table}[h!]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|l|l|l|l|}
+\hline
+\textbf{Step} & \textbf{Layer} & \textbf{Configuration} & \textbf{Input Shape} & \textbf{Output Shape} \\
+\hline
+
+1 & Input & Grayscale Images & 
+$[B, H, W]$ &
+$[B, H, W]$ \\
+
+\hline
+2 & Reshape & Add channel dimension &
+$[B, H, W]$ &
+$[B, 1, H, W]$ \\
+
+\hline
+3 & Conv2D (conv1) &
+$1 \rightarrow 8$, kernel $3 \times 3$ &
+$[B, 1, H, W]$ &
+$[B, 8, H-2, W-2]$ \\
+
+\hline
+4 & Dropout &
+$p = 0.5$ &
+$[B, 8, H-2, W-2]$ &
+$[B, 8, H-2, W-2]$ \\
+
+\hline
+5 & Conv2D (conv2) &
+$8 \rightarrow 16$, kernel $3 \times 3$ &
+$[B, 8, H-2, W-2]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+6 & Dropout &
+$p = 0.5$ &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+7 & ReLU &
+Activation &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+8 & Adaptive Avg Pool &
+Output size $8 \times 8$ &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, 8, 8]$ \\
+
+\hline
+9 & Flatten &
+$16 \times 8 \times 8$ &
+$[B, 16, 8, 8]$ &
+$[B, 1024]$ \\
+
+\hline
+10 & Linear (fc1) &
+$1024 \rightarrow \texttt{hidden\_size}$ &
+$[B, 1024]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+11 & Dropout &
+$p = 0.5$ &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+12 & ReLU &
+Activation &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+13 & Linear (fc2) &
+$\texttt{hidden\_size} \rightarrow \texttt{num\_classes}$ &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{num\_classes}]$ \\
+
+\hline
+\end{tabular}
+\caption{Detailed architecture of the convolutional neural network implemented in Burn. 
+$B$ denotes batch size, $H$ and $W$ denote input image height and width respectively.}
+\label{tab:burn-cnn-architecture}
+\end{table}
+
+\noindent\textbf{Notes:}
+\begin{itemize}
+  \item All convolution layers use default stride = 1 and no padding.
+  \item Dropout probability is configurable via \texttt{ModelConfig.dropout}.
+  \item Adaptive average pooling ensures a fixed spatial resolution regardless of input size.
+  \item The model is fully differentiable and backend-agnostic via Burn's \texttt{Backend} trait.
+\end{itemize}
+
+\section{Rust Dockerfile Analysis: \texttt{Dockerfile.mnist\_inf}}
+
+The \texttt{Dockerfile.mnist\_inf} file defines the containerization process for the Rust-based MNIST inference service. It utilizes a \textbf{multi-stage build strategy} to optimize the final image size and security by separating the build environment from the runtime environment.
+
+\subsection{Multi-Stage Build Optimization}
+The Dockerfile is divided into two distinct stages:
+\begin{enumerate}
+    \item \textbf{Builder Stage:} A heavier image containing the full Rust toolchain (compiler, cargo, libraries) used to compile the source code.
+    \item \textbf{Runtime Stage:} A minimal Alpine Linux image containing only the compiled binary and necessary system libraries.
+\end{enumerate}
+
+\textbf{Benefit:} This approach ensures that the final production image does not contain unnecessary build artifacts (like the \texttt{target/} directory, source code, or the Rust compiler itself), resulting in a significantly smaller and more secure container.
+
+\subsection{Step-by-Step Explanation}
+
+\subsubsection{Stage 1: The Builder}
+
+\begin{itemize}
+    \item \texttt{FROM rust:1.92-alpine as builder} \\
+    Initializes the build stage using the official Rust 1.92 image based on Alpine Linux. The \texttt{as builder} alias allows us to refer to this stage later. Alpine is chosen for its lightweight nature.
+    
+    \item \texttt{WORKDIR /app/rust\_ml} \\
+    Sets the working directory inside the container to \texttt{/app/rust\_ml}, ensuring all subsequent commands execute in this context.
+    
+    \item \texttt{COPY . /app/rust\_ml/} \\
+    Copies the entire build context (source code) from the host machine into the container's working directory. This includes the \texttt{rust\_ml} workspace and likely the root context required for build resolution.
+    
+    \item \texttt{RUN cargo build --release -p mnist\_infer} \\
+    Executes the compilation command. 
+    \begin{itemize}
+        \item \texttt{--release}: Compiles with optimizations enabled for maximum performance.
+        \item \texttt{-p mnist\_infer}: specifically targets the \texttt{mnist\_infer} package within the workspace.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Stage 2: The Runtime}
+
+\begin{itemize}
+    \item \texttt{FROM alpine:3.23} \\
+    Starts a fresh, clean layer using Alpine Linux 3.23. This is a minimal distribution (approx. 5MB) ideal for production containers.
+    
+    \item \texttt{RUN apk add --no-cache openssl-dev ca-certificates} \\
+    Installs necessary runtime dependencies:
+    \begin{itemize}
+        \item \texttt{openssl-dev}: Required for cryptographic operations (often needed by web frameworks like Axum or Tokio).
+        \item \texttt{ca-certificates}: Ensures the container can verify SSL/TLS certificates when making outbound HTTPS requests.
+        \item \texttt{--no-cache}: Prevents caching the package index locally, keeping the image size small.
+    \end{itemize}
+    
+    \item \texttt{WORKDIR /app} \\
+    Sets the working directory for the runtime container to \texttt{/app}.
+    
+    \item \texttt{COPY --from=builder /app/rust\_ml/target/release/mnist\_infer /app/mnist\_infer} \\
+    \textbf{Crucial Step:} Copies \textit{only} the compiled executable from the \texttt{builder} stage into the runtime image. The bulky source code and build tools are left behind.
+    
+    \item \texttt{COPY ./model/mnist\_rust/model.mpk /app/model/mnist\_rust/model.mpk} \\
+    Copies the pre-trained model file (\texttt{model.mpk}) from the host's file system into the container. This ensures the inference service has the model artifact available locally.
+    
+    \item \texttt{ENV RUST\_LOG=info} \\
+    Sets the logging level to \texttt{info}, controlling the verbosity of the application's output.
+    
+    \item \texttt{ENV MODEL\_PATH=/app/model/mnist\_rust/model.mpk} \\
+    Defines an environment variable pointing to the location of the model file, which the application reads at startup.
+    
+    \item \texttt{EXPOSE 9050} \\
+    Documents that the container listens on port 9050, allowing traffic to reach the inference API.
+    
+    \item \texttt{CMD ["./mnist\_infer"]} \\
+    Specifies the command to run when the container starts: executing the compiled binary.
+\end{itemize}
+
+\section{Python (PyTorch) Dockerfile}
+
+This section details the image optimization strategy implemented for the MNIST inference container. The core approach minimizes the Docker image size by decoupling the heavy machine learning dependencies (PyTorch, etc.) from the application container. Instead of baking these libraries into the image, they are stored on an external volume (NFS share) and mounted at runtime.
+
+\subsection{Dockerfile Analysis}
+
+The \texttt{Dockerfile} is kept intentionally lightweight. By excluding large dependencies like \texttt{torch} from the \texttt{pip install} command, the image size remains very small (only containing the base Python runtime and lightweight web frameworks).
+
+\begin{lstlisting}[language=Dockerfile, caption={Optimized Inference Dockerfile}, label={lst:dockerfile_inference}]
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+
+# Critical: Point Python to the external volume
+ENV PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages
+
+WORKDIR /app
+
+# Only install lightweight app dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install fastapi==0.110.0 uvicorn==0.29.0 python-multipart==0.0.9
+
+COPY app.py model.py model.pt ./
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Base Image:} Uses \texttt{python:3.12-slim} to minimise the OS footprint.
+    \item \textbf{Environment Configuration:} 
+    \begin{itemize}
+        \item \texttt{PYTHONDONTWRITEBYTECODE=1}: Prevents Python from writing \texttt{.pyc} files to disk.
+        \item \textbf{\texttt{PYTHONPATH}}: Crucially set to \texttt{/external-libs/ml\_env/lib/python3.12/site-packages}. This instructs the Python interpreter to look for libraries in the mounted volume directory, not just the default system paths.
+    \end{itemize}
+    \item \textbf{Minimal Dependencies:} The \texttt{pip install} command only installs \texttt{fastapi}, \texttt{uvicorn}, and \texttt{python-multipart}. Heavy ML libraries are assumed to be present in the mounted volume.
+\end{itemize}
+
+\subsection{Volume Mounting Strategy}
+
+The strategy relies on two shell scripts to set up the environment on the host machine and run the container with the correct volume mappings.
+
+\subsubsection{Library Setup (\texttt{mount\_libs.sh})}
+This script runs on the host machine (or a VM node) to prepare the shared library volume.
+\begin{enumerate}
+    \item \textbf{NFS Client Installation:} It installs \texttt{nfs-common} to enable Network File System capabilities.
+    \item \textbf{Mounting:} It connects to a remote NFS server (\texttt{172.16.203.14}) where the pre-installed ML libraries reside.
+    \item \textbf{Local Path:} The remote libraries are mounted to \texttt{/mnt/ml-libs} on the host. This directory acts as the bridge between the NFS server and the Docker container.
+\end{enumerate}
+
+\subsubsection{Runtime Execution (\texttt{run\_container.sh})}
+This script launches the Docker container with the necessary runtime configurations to access the external libraries.
+
+\begin{lstlisting}[language=Bash, caption={Container Execution Command}]
+docker run -d \
+  -v /mnt/ml-libs:/external-libs \
+  -e PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages \
+  -p 8000:8000 \
+  fastapi-ml-app
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{\texttt{-v /mnt/ml-libs:/external-libs}}: This bind mount maps the host's \texttt{/mnt/ml-libs} (which contains the NFS data) to \texttt{/external-libs} inside the container.
+    \item \textbf{\texttt{-e PYTHONPATH=...}}: explicit environment variable override ensures the container's Python runtime finds the packages in \texttt{/external-libs}.
+\end{itemize}
+
+\subsection{Benefits and Optimization}
+
+\begin{table}[h!]
+\centering
+\caption{Optimization Benefits}
+\label{tab:docker_optimization}
+\begin{tabular}{|l|p{6cm}|p{6cm}|}
+\hline
+\textbf{Feature} & \textbf{Standard Approach} & \textbf{Volume Mount Approach} \\ \hline
+\textbf{Image Size} & \textbf{Huge} (>2GB). Includes PyTorch, CUDA binaries, and all dependencies. & \textbf{Tiny} (~100MB). Only contains app code and minimal HTTP libs. \\ \hline
+\textbf{Build Time} & \textbf{Slow}. Downloading and installing PyTorch takes minutes. & \textbf{Fast}. setup only installs \texttt{fastapi}. \\ \hline
+\textbf{Updates} & requires rebuilding and pushing large layers for every code change. & Code changes only require rebuilding the tiny app layer. Library updates are handled externally. \\ \hline
+\end{tabular}
+\end{table}
+
+This architecture allows for rapid deployment and updating of the application logic without the overhead of moving gigabytes of container layers for unchanged machine learning dependencies.
+
+\section{Rust CI/CD}
+
+\section{Python CI/CD}
+
+\end{document}

@@ -1,0 +1,104 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{minted}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{\textbf{Comparative Analysis of LSTM Implementation: Rust (Burn) vs. PyTorch}}
+\author{Technical Report}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+This document outlines the detailed architectural, mathematical, and translational specifics of implementing a Long Short-Term Memory (LSTM) model across two prominent machine learning environments: Rust (using the Burn framework) and Python (using PyTorch). It covers the model architecture, training pipelines, specialized deployment techniques using network filesystems (NFS) with Docker, and language-specific design implications.
+
+\section{Model Architecture and Mathematical Formulation}
+
+\subsection{Mathematical Foundation of the LSTM Cell}
+The core of the model revolves around a custom, manually-implemented LSTM cell. Instead of relying on the standard un-inspectable black-box LSTM implementations provided by typical ML libraries, both codebases explicitly define the cell-level math. 
+
+For a given timestep $t$, the input tensor $x_t$ and the previous hidden state $h_{t-1}$ are used to compute the various gates. The mathematical formulation utilized is:
+\begin{align}
+    f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \quad &\text{(Forget Gate)} \\
+    i_t &= \sigma(W_i \cdot [h_{t-1}, x_t] + b_i) \quad &\text{(Input Gate)} \\
+    g_t &= \tanh(W_g \cdot [h_{t-1}, x_t] + b_g) \quad &\text{(Candidate State)} \\
+    o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \quad &\text{(Output Gate)}
+\end{align}
+\begin{align}
+    c_t &= f_t \odot c_{t-1} + i_t \odot g_t \quad &\text{(New Cell State)} \\
+    h_t &= o_t \odot \tanh(c_t) \quad &\text{(New Hidden State)}
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $\sigma$ represents the Sigmoid activation function.
+    \item $\tanh$ represents the Hyperbolic Tangent activation function.
+    \item $\odot$ denotes element-wise multiplication (Hadamard product).
+    \item $[h_{t-1}, x_t]$ symbolizes the concatenation of the previous hidden state and the current input.
+\end{itemize}
+
+\subsection{Architectural Details}
+Both implementations adhere strictly to the following architectural design:
+\begin{enumerate}
+    \item \textbf{Layer Normalization:} Pre-activation gates, the cell state ($c_t$), and the hidden state ($h_t$) pass through separate \texttt{LayerNorm} layers. This design choice stabilizes training dynamics since the feature distributions inside the LSTM evolve at every sequence step (making standard Batch Normalization ineffective).
+    \item \textbf{Optimized Gate Compute:} Instead of computing 4 separate linear transformations per timestep for the features, the model employs a single combined projection that outputs a $4 \times \text{hidden\_size}$ tensor. This tensor is subsequently split into four chunks corresponding to the $i, f, g$, and $o$ gates.
+    \item \textbf{Bidirectional Support:} An encapsulated \texttt{StackedLstm} module stacks multiple manual LSTM layers (applying dropout between layers except on the final one). The main \texttt{LstmNetwork} integrates a forward processing stack and an optional backward processing stack (which flips the temporal dimension of the input sequence). Their respective output hidden states are concatenated along the feature dimension before passing through a fully-connected projection head.
+    \item \textbf{Initialization bias:} The forget-gate bias parameters are explicitly initialized to $1.0$ (via Xavier Normal parameter slicing) to prevent fatal early-training gradient decay.
+\end{enumerate}
+
+
+\section{Training Pipeline}
+The training behavior is intentionally synchronized to ensure parity between the languages:
+\begin{itemize}
+    \item \textbf{Data Loading:} Operates synchronously on synthetically generated noisy sequential datasets. The validation set is scaled symmetrically relative to the training set ($20\%$ of training size).
+    \item \textbf{Optimization Algorithm:} Utilizes the Adam Optimizer.
+    \item \textbf{Loss Function:} Mean Squared Error (MSE), with reduction set to \textit{mean}. Both explicitly weigh loss accumulation during epoch passes by scaling local batch losses by the discrete batch size, averaging properly at the conclusion of the epoch.
+    \item \textbf{Gradient Clipping:} Ensures numerical stability on longer sequence inputs. The gradient norm is strictly clipped to $\max = 1.0$ right before the optimizer steps.
+    \item \textbf{Artifacts Output:} Training scripts generate an \texttt{artifact\_dir} where they store a \texttt{config.json} representation of hyperparameters, and the full state dictionary (\texttt{model.pt} in PyTorch; CompactRecorder files in Rust Burn).
+\end{itemize}
+
+\section{Inference Pipeline and Docker NFS Integration}
+\subsection{PyTorch Inference Architecture}
+A critical requirement for modern PyTorch inference deployments is resolving the massive disk footprint of CUDA-enabled PyTorch backend libraries. The PyTorch pipeline employs a sophisticated Network File System (NFS) logic to achieve a highly optimized, lightweight Dockerized inference deployment:
+\begin{enumerate}
+    \item \textbf{External Library Mounting:} A host-level script (\texttt{mount\_libs.sh}) maps an external NAS/NFS storage partition (from \texttt{172.16.203.14}) loaded with Python environments targeting \texttt{/mnt/LSTM-libs}.
+    \item \textbf{Optimized Dockerfile:} The image leverages the \texttt{nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04} base image and installs basic \texttt{python3.11} runtime headers without calling \texttt{pip install torch}. Thus, the final image size is structurally negligible compared to standard ml-images.
+    \item \textbf{Runtime Binding:} The inference container bootloader scripts (\texttt{run\_container.sh}) bind these volume mounts (\texttt{-v \$NFS\_MOUNT\_POINT:/external-libs}) and crucially overrides the \texttt{PYTHONPATH} env-variable:
+    \begin{verbatim}
+    -e PYTHONPATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/.../site-packages"
+    \end{verbatim}
+    \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively.
+\end{enumerate}
+
+\subsection{Rust Inference Architecture}
+Rust's inference pipeline diverges significantly regarding deployment complexity due to compilation structures:
+\begin{itemize}
+    \item \textbf{Stateless Binaries:} No containerized runtime libraries are mandated because Burn compiles statically down to heavily optimized binaries, pulling model states directly via the \texttt{CompactRecorder}.
+    \item \textbf{Visualization:} Results are mapped into native Polars \texttt{DataFrame} objects (\texttt{df![]}) rendering lightweight native tables detailing \textit{expected targets} versus \textit{computed predictions}.
+\end{itemize}
+
+\section{Implementation Specifics}
+\subsection{PyTorch Specific Constraints}
+\begin{itemize}
+    \item \textbf{Dynamic computation graphing:} The \texttt{model.py} cleanly slices and chunks gates natively on tensors (e.g., \texttt{gates.chunk(4, dim=1)}).
+    \item \textbf{Sequence Reversals:} Done programmatically via continuous \texttt{Tensor.flip(dims=[1])} which mandates that tensors must remain contiguously stored within PyTorch internals to avoid memory reallocation overhead.
+    \item \textbf{Seed Setting API:} Requires deterministic locking across four sub-systems (\texttt{random, numpy, torch, torch.cuda}) to match Rust's reproducibility parameters.
+\end{itemize}
+
+\subsection{Rust (Burn) Specific Constraints}
+\begin{itemize}
+    \item \textbf{Compile-Time Dimension Types:} Rust explicitly binds Tensor dimensionality at compile time (\texttt{Tensor<B, 3>} vs \texttt{Tensor<B, 2>}). This offers un-matched safety by forbidding invalid dimension injections that PyTorch would crash on dynamically.
+    \item \textbf{Trait Encapsulation:} Leverages explicit trait architectures (\texttt{\#[derive(Module, Config)]}) that automate saving hyperparameters and generating gradient backends. Burn models must be mapped cleanly from standard states to \texttt{autodiff} states.
+    \item \textbf{No-Mutation Logic:} State mutations generated sequentially in LSTMs are represented safely utilizing explicit tuple destructuring via \texttt{LstmState\{hidden, cell\}}, bypassing complex internal pointer tracking.
+    \item \textbf{Explicit Initialization Handling:} Since Burn limits orthogonal initializes out-of-the-box, Xavier Normalization was invoked explicitly, paired with \texttt{slice\_assign} tensor mappings to safely load the 1.0 uniform fill into the forget-gate components. 
+\end{itemize}
+
+\end{document}
