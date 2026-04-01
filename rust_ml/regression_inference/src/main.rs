@@ -27,7 +27,7 @@ async fn main() {
 	// Load Model State
 	// In Docker, it'll mount to /app/model. mpk is the default extension from burn's NoStdTrainingRecorder
 	let model_path = std::env::var("MODEL_PATH")
-		.unwrap_or_else(|_| -> String { "./model".to_string() });
+		.unwrap_or_else(|_| -> String { "model/regression_train/model.bin".to_string() });
 
 	// Let the AppState construct the pre-loaded memory model
 	let state = AppState::new(&model_path);
@@ -41,7 +41,7 @@ async fn main() {
 		.with_state(state);
 
 	// Run Server
-	let port = 9060;
+	let port = 9050;
 	let addr = SocketAddr::from(([0, 0, 0, 0], port));
 	tracing::info!("Server listening on http://{}", addr);
 

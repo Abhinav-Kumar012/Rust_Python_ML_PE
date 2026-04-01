@@ -27,7 +27,7 @@ async fn main() {
 
 	// Load Model State
 	let model_dir = std::env::var("MODEL_DIR")
-		.unwrap_or_else(|_| -> String { "./model".to_string() });
+		.unwrap_or_else(|_| -> String { "model/lstm_train".to_string() });
 
 	// Let the AppState construct the pre-loaded memory model
 	let state = AppState::new(&model_dir);
@@ -41,7 +41,7 @@ async fn main() {
 		.with_state(state);
 
 	// Run Server
-	let port = 9070;
+	let port = 9050;
 	let addr = SocketAddr::from(([0, 0, 0, 0], port));
 	tracing::info!("Server listening on http://{}", addr);
 
