@@ -29,13 +29,16 @@ FROM nvidia/vulkan:1.3-470
 WORKDIR /app
 
 # Copy compiled binary from builder
-COPY --from=builder /app/rust_ml/target/release/lstm_inference /app/lstm_inference
+COPY --from=builder /app/rust_ml/target/release/lstm_inference /app/binary
+
+COPY ./model/lstm_train/config.json /app//model/lstm_train/config.json
+COPY ./model/lstm_train/model.mpk /app//model/lstm_train/model.mpk
 
 # Environment variables
 ENV RUST_LOG=info
 # Setup the default mounted model path
-ENV MODEL_DIR=/app/model/lstm_train_rust
+ENV MODEL_DIR=/app/model/lstm_train
 
-EXPOSE 9070
+EXPOSE 9050
 
-CMD ["./lstm_inference"]
+CMD ["./binary"]

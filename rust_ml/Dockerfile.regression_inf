@@ -31,13 +31,14 @@ FROM nvidia/vulkan:1.3-470
 WORKDIR /app
 
 # Copy compiled binary from builder
-COPY --from=builder /app/rust_ml/target/release/regression_inference /app/regression_inference
+COPY --from=builder /app/rust_ml/target/release/regression_inference /app/binary
 
+COPY ./model/regression_train/model.bin /app/model/regression_train/model.bin
 # Environment variables
 ENV RUST_LOG=info
 # Setup the default mounted model path
-ENV MODEL_PATH=/app/model/regression_rust/model
+ENV MODEL_PATH=/app/model/regression_train/model.bin
 
-EXPOSE 9060
+EXPOSE 9050
 
-CMD ["./regression_inference"]
+CMD ["./binary"]
