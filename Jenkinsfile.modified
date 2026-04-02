@@ -1,0 +1,192 @@
+/*
+ * LSTM — Inference Evaluation Pipeline
+ */
+pipeline {
+    agent any
+
+    environment {
+        BUILD_CTX      = "${WORKSPACE}"
+        METRICS_DIR    = "${WORKSPACE}/eval_metrics/lstm"
+
+        MODEL_NAME     = "lstm"
+        IMAGE_GPU      = "py-lstm-gpu"
+
+        CONTAINER_NAME = "eval-lstm"
+        EVAL_PORT      = "8002"
+
+        PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+    }
+
+    stages {
+        stage('Setup') {
+            steps {
+                sh "mkdir -p ${METRICS_DIR}"
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    buildImg(IMAGE_GPU, 'python_ml/pytorch/LSTM/Inference/Dockerfile')
+                }
+            }
+        }
+
+        stage('Image Metrics') {
+            steps {
+                script {
+                    measureImg(IMAGE_GPU)
+                }
+            }
+        }
+
+        stage('Evaluate') {
+            steps {
+                script {
+                    evaluate(IMAGE_GPU, EVAL_PORT)
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+            archiveArtifacts artifacts: 'eval_metrics/lstm/**/*', allowEmptyArchive: true
+        }
+    }
+}
+
+def buildImg(String image, String dockerfile) {
+    def t0 = System.currentTimeMillis()
+    def status = 'SUCCESS'
+
+    try {
+        sh "docker build -t ${image} -f ${dockerfile} ${BUILD_CTX}"
+    } catch (Exception e) {
+        status = 'FAILURE'
+        throw e
+    } finally {
+        def dur = System.currentTimeMillis() - t0
+        def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+        sh """
+            cat > ${METRICS_DIR}/${image}_build.json <<EOF
+{
+  "dimension": "1_cicd_build",
+  "model": "${MODEL_NAME}",
+  "image": "${image}",
+  "status": "${status}",
+  "build_duration_ms": ${dur},
+  "timestamp": "${ts}"
+}
+EOF
+        """
+    }
+}
+
+def measureImg(String image) {
+    sh """
+        SB=\$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
+        LC=\$(docker history -q ${image} 2>/dev/null | wc -l)
+        SM=\$(echo "scale=2; \$SB / 1048576" | bc)
+
+        cat > ${METRICS_DIR}/${image}_image.json <<EOF
+{
+  "dimension": "2_image_size",
+  "image": "${image}",
+  "size_bytes": \$SB,
+  "size_mb": \$SM,
+  "layers": \$LC
+}
+EOF
+    """
+}
+
+def evaluate(String image, String port) {
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+    sh """
+        T0=\$(date +%s%3N)
+
+        docker run -d \
+            --name ${CONTAINER_NAME} \
+            -p ${port}:8000 \
+            -v ${METRICS_DIR}:/app/devops_metrics \
+            ${image}
+
+        T1=\$(date +%s%3N)
+
+        echo "Container launched, waiting for readiness..."
+
+        READY=0
+
+        for i in \$(seq 1 300); do
+            HEALTH_STATUS=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${CONTAINER_NAME} 2>/dev/null || echo "missing")
+
+            if [ "\$HEALTH_STATUS" = "healthy" ]; then
+                READY=1
+                break
+            fi
+
+            if curl -sf http://localhost:${port}/health > /dev/null 2>&1; then
+                READY=1
+                break
+            fi
+
+            sleep 0.1
+        done
+
+        T2=\$(date +%s%3N)
+
+        CONTAINER_START_MS=\$((T1 - T0))
+        APP_READY_MS=\$((T2 - T1))
+        TOTAL_COLD_START_MS=\$((T2 - T0))
+
+        if [ "\$READY" -eq 1 ]; then
+            HEALTH_PAYLOAD=\$(curl -sf http://localhost:${port}/health 2>/dev/null || echo '{}')
+
+            cat > ${METRICS_DIR}/cold_start.json <<EOF
+{
+  "dimension": "3_cold_start",
+  "model": "${MODEL_NAME}",
+  "container_start_ms": \$CONTAINER_START_MS,
+  "app_ready_ms": \$APP_READY_MS,
+  "total_cold_start_ms": \$TOTAL_COLD_START_MS,
+  "health_status": \$HEALTH_PAYLOAD
+}
+EOF
+
+            echo "Container start: \${CONTAINER_START_MS}ms"
+            echo "App ready: \${APP_READY_MS}ms"
+            echo "Total cold start: \${TOTAL_COLD_START_MS}ms"
+        else
+            cat > ${METRICS_DIR}/cold_start.json <<EOF
+{
+  "dimension": "3_cold_start",
+  "model": "${MODEL_NAME}",
+  "container_start_ms": \$CONTAINER_START_MS,
+  "app_ready_ms": -1,
+  "total_cold_start_ms": -1,
+  "error": "Application did not become ready within timeout"
+}
+EOF
+
+            echo "Application failed to become ready within timeout"
+            docker logs ${CONTAINER_NAME} || true
+            exit 1
+        fi
+    """
+
+    sh """
+        curl -sf http://localhost:${port}/metrics | python3 -m json.tool > ${METRICS_DIR}/app_metrics.json || echo '{}' > ${METRICS_DIR}/app_metrics.json
+
+        docker stats --no-stream --format '{"dimension":"5_resources","cpu":"{{.CPUPerc}}","mem":"{{.MemUsage}}"}' ${CONTAINER_NAME} > ${METRICS_DIR}/docker_stats.json || true
+
+        docker inspect ${CONTAINER_NAME} > ${METRICS_DIR}/container_inspect.json || true
+    """
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+}
