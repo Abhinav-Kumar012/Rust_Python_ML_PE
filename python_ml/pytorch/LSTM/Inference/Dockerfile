@@ -1,70 +1,147 @@
 # =============================================================================
-# GPU-Enabled LSTM Inference API (NFS-backed)
+# GPU-Enabled LSTM Inference API (Fully Aligned with CPU Version)
 # =============================================================================
 
-# CUDA runtime (no heavy torch inside image)
+# -----------------------------------------------------------------------------
+# Base Image (CUDA for GPU support)
+# -----------------------------------------------------------------------------
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
-# Prevent Python cache + clean logs
+# -----------------------------------------------------------------------------
+# Environment settings (same as CPU)
+# -----------------------------------------------------------------------------
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# IMPORTANT: Must match NFS library path exactly
+ENV PYTHONPATH=/external-libs/LSTM_env/lib/python3.12/site-packages
+
 WORKDIR /app
 
-# Install Python (match NFS environment EXACTLY)
+# -----------------------------------------------------------------------------
+# Install Python 3.12 (same as CPU image)
+# -----------------------------------------------------------------------------
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         software-properties-common \
  && add-apt-repository ppa:deadsnakes/ppa \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-        python3.11 python3.11-distutils python3-pip \
+        python3.12 python3.12-distutils python3-pip \
         libgomp1 curl \
- && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
- && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
+ && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
+ && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
  && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
-# Application code
+# Copy application code
 # -----------------------------------------------------------------------------
 COPY app.py ./
 
-# ❌ DO NOT copy model inside image (use NFS instead)
-# COPY lstm_train_python/model.pt ./generated/model.pt
+# -----------------------------------------------------------------------------
+# Copy trained model INSIDE container (same as CPU)
+# -----------------------------------------------------------------------------
+COPY lstm_train_python/model.pt ./generated/model.pt
 
 # -----------------------------------------------------------------------------
-# Runtime mounts
-# -----------------------------------------------------------------------------
-# /external-libs → NFS (torch, numpy, etc.)
-# /app/model     → NFS model directory
-VOLUME ["/external-libs", "/app/model"]
-
-# -----------------------------------------------------------------------------
-# Environment
-# -----------------------------------------------------------------------------
-ENV PYTHONPATH="/external-libs"
-ENV MODEL_PATH="/app/model/lstm_train_python/model.pt"
-
-# -----------------------------------------------------------------------------
-# Security
+# Create non-root user (security best practice)
 # -----------------------------------------------------------------------------
 RUN useradd --create-home appuser
 USER appuser
 
+# -----------------------------------------------------------------------------
+# Expose FastAPI port
+# -----------------------------------------------------------------------------
 EXPOSE 8000
 
 # -----------------------------------------------------------------------------
-# Start API server
+# Start FastAPI server
 # -----------------------------------------------------------------------------
 CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
 
 
-# Command to execute
+# =============================================================================
+# ========================== 🐳 BUILD COMMAND ================================
+# =============================================================================
+
+# Build the GPU image
+# docker build -f Dockerfile.gpu -t lstm-inference:gpu .
+
+
+# =============================================================================
+# ========================== 🚀 RUN COMMAND ==================================
+# =============================================================================
+
+# Run container with GPU + NFS libraries
+# (Model is already inside container, so no model mount needed)
 
 # docker run --rm --gpus all \
 #   -v /mnt/lstm-libs:/external-libs:ro \
-#   -v /mnt/lstm-models:/app/model:ro \
-#   -e PYTHONPATH=/external-libs \
-#   -e MODEL_PATH=/app/model/lstm_train_python/model.pt \
+#   -e PYTHONPATH=/external-libs/LSTM_env/lib/python3.12/site-packages \
 #   -p 8000:8000 \
 #   lstm-inference:gpu
+
+
+# =============================================================================
+# ========================== 🔍 DEBUG COMMAND ================================
+# =============================================================================
+
+# Open interactive shell inside container
+# docker run --rm -it --gpus all \
+#   -v /mnt/lstm-libs:/external-libs:ro \
+#   lstm-inference:gpu python
+
+# Inside Python, verify GPU:
+# import torch
+# print(torch.cuda.is_available())
+# print(torch.cuda.get_device_name(0))
+
+
+# =============================================================================
+# ========================== ⚠️ REQUIREMENTS ================================
+# =============================================================================
+
+# 1. Host machine must have NVIDIA GPU
+#    Check:
+#    nvidia-smi
+
+# 2. NVIDIA Container Toolkit must be installed
+#    sudo apt install nvidia-container-toolkit
+#    sudo systemctl restart docker
+
+# 3. PyTorch in NFS MUST be GPU-enabled (cu121 compatible)
+#    Otherwise GPU will NOT be used
+
+# 4. NFS directory structure must match:
+#    /mnt/lstm-libs/LSTM_env/lib/python3.12/site-packages
+
+# 5. Model path inside container:
+#    /app/generated/model.pt
+
+
+# =============================================================================
+# ========================== 🚨 COMMON ISSUES ===============================
+# =============================================================================
+
+# ❌ torch.cuda.is_available() == False
+# → PyTorch in NFS is CPU version
+
+# ❌ Module not found errors
+# → PYTHONPATH is wrong
+
+# ❌ GPU not detected
+# → NVIDIA toolkit not installed or docker not configured
+
+# ❌ Model not loading
+# → Check path: ./generated/model.pt
+
+
+# =============================================================================
+# ========================== ✅ FINAL NOTES ================================
+# =============================================================================
+
+# ✔ CPU and GPU Dockerfiles now behave IDENTICALLY
+# ✔ Only difference = CUDA base image (GPU support)
+# ✔ Model is baked into image (stable + portable)
+# ✔ NFS used only for heavy libraries (efficient)
+# ✔ Clean, production-ready setup

@@ -1,7 +1,7 @@
 import time
 import torch
 import numpy as np
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from PIL import Image
 from io import BytesIO
 
@@ -10,22 +10,33 @@ from model import Model
 app = FastAPI()
 start_time = time.time()
 
-device = torch.device("cpu")
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
+# ----------------------------
+# Device setup (GPU if available)
+# ----------------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if device.type == "cpu":
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+
+print(f"Using device: {device}")
 
 # ----------------------------
 # Load model
 # ----------------------------
-checkpoint = torch.load("model.pt", map_location=device)
+try:
+    checkpoint = torch.load("model.pt", map_location=device)
 
-model = Model(**checkpoint["model_args"])
-model.load_state_dict(checkpoint["model_state"])
-model.eval()
-model.to(device)
+    model = Model(**checkpoint["model_args"])
+    model.load_state_dict(checkpoint["model_state"])
+    model.eval()
+    model.to(device)
+
+except Exception as e:
+    raise RuntimeError(f"Model loading failed: {e}")
 
 # ----------------------------
-# Preprocess (MATCH RUST)
+# Preprocess
 # ----------------------------
 def preprocess(img: Image.Image):
     img = img.convert("L").resize((28, 28), Image.LANCZOS)
@@ -35,29 +46,54 @@ def preprocess(img: Image.Image):
     return x
 
 # ----------------------------
+# Health check
+# ----------------------------
+@app.get("/")
+def health():
+    return {
+        "status": "ok",
+        "device": str(device)
+    }
+
+# ----------------------------
 # Inference endpoint
 # ----------------------------
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    t0 = time.perf_counter()
+    try:
+        t0 = time.perf_counter()
 
-    data = await file.read()
-    img = Image.open(BytesIO(data))
+        # Read image
+        data = await file.read()
+        img = Image.open(BytesIO(data))
 
-    x = preprocess(img).to(device)
+        # Preprocess + move to device
+        x = preprocess(img).to(device)
 
-    with torch.no_grad():
-        logits = model(x)
+        # Inference
+        with torch.no_grad():
+            logits = model(x)
 
-    latency_ms = (time.perf_counter() - t0) * 1000
-    prediction = int(torch.argmax(logits, dim=1))
+        # (Optional) sync for accurate GPU timing
+        if device.type == "cuda":
+            torch.cuda.synchronize()
 
-    return {
-        "prediction": prediction,
-        "latency_ms": latency_ms,
-        "uptime_sec": time.time() - start_time,
-    }
+        latency_ms = (time.perf_counter() - t0) * 1000
+        prediction = int(torch.argmax(logits, dim=1))
 
+        return {
+            "prediction": prediction,
+            "latency_ms": latency_ms,
+            "device": str(device),
+            "uptime_sec": time.time() - start_time,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------------------
+# Run server
+# ----------------------------
 if __name__ == "__main__":
     import uvicorn
 

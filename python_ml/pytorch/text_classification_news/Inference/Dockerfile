@@ -1,28 +1,137 @@
+# =============================================================================
+# GPU Dockerfile (ALIGNED with existing CPU Dockerfile)
+# Only difference = CUDA base + GPU capability
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Base Image (GPU-enabled)
+# -----------------------------------------------------------------------------
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
+# -----------------------------------------------------------------------------
+# Environment (same as CPU)
+# -----------------------------------------------------------------------------
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# IMPORTANT: Must match CPU exactly (NFS-based libs)
+ENV PYTHONPATH=/external-libs/text_env/lib/python3.12/site-packages
+
 WORKDIR /app
 
+# -----------------------------------------------------------------------------
+# Install Python 3.12 (to match CPU image)
+# -----------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-distutils \
+    python3.12 \
+    python3.12-distutils \
+    python3-pip \
+    libgomp1 \
     curl \
-    gcc \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+# -----------------------------------------------------------------------------
+# Copy application code (same as CPU)
+# -----------------------------------------------------------------------------
+COPY app.py ./
 
-COPY requirements.docker.txt .
+# -----------------------------------------------------------------------------
+# Copy model INSIDE container (same as CPU)
+# -----------------------------------------------------------------------------
+COPY model_pytorch_text_classification/ag_news_model.pth ./model/
 
-RUN pip install --no-cache-dir \
-    numpy==1.26.4 \
-    --extra-index-url https://download.pytorch.org/whl/cu121 \
-    -r requirements.docker.txt
+# -----------------------------------------------------------------------------
+# Security (recommended, same behavior improvement)
+# -----------------------------------------------------------------------------
+RUN useradd --create-home appuser
+USER appuser
 
-COPY . .
-
+# -----------------------------------------------------------------------------
+# Expose API port
+# -----------------------------------------------------------------------------
 EXPOSE 8000
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# -----------------------------------------------------------------------------
+# Start FastAPI server (same as CPU)
+# -----------------------------------------------------------------------------
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+# =============================================================================
+# ========================== 🐳 BUILD COMMAND ================================
+# =============================================================================
+
+# docker build -f Dockerfile.gpu -t text-inference:gpu .
+
+
+# =============================================================================
+# ========================== 🚀 RUN COMMAND (GPU) =============================
+# =============================================================================
+
+# docker run -d \
+#   --name text_container \
+#   --gpus all \
+#   -v /mnt/text-libs:/external-libs:ro \
+#   -e PYTHONPATH=/external-libs/text_env/lib/python3.12/site-packages \
+#   -p 8000:8000 \
+#   text-inference:gpu
+
+
+# =============================================================================
+# ========================== 🔍 DEBUG GPU ====================================
+# =============================================================================
+
+# docker exec -it text_container python
+
+# Inside Python:
+# import torch
+# print(torch.cuda.is_available())
+# print(torch.cuda.get_device_name(0))
+
+
+# =============================================================================
+# ========================== ⚠️ REQUIREMENTS =================================
+# =============================================================================
+
+# 1. NFS (/mnt/text-libs) must contain:
+#    → torch (GPU version, cu121)
+#    → numpy, etc.
+
+# 2. Check GPU on host:
+#    nvidia-smi
+
+# 3. Install NVIDIA container toolkit:
+#    sudo apt install nvidia-container-toolkit
+#    sudo systemctl restart docker
+
+# 4. PYTHONPATH MUST match exactly:
+#    /external-libs/text_env/lib/python3.12/site-packages
+
+
+# =============================================================================
+# ========================== 🚨 COMMON ISSUES ===============================
+# =============================================================================
+
+# ❌ torch.cuda.is_available() == False
+# → NFS torch is CPU version
+
+# ❌ ModuleNotFoundError
+# → Wrong PYTHONPATH or missing NFS mount
+
+# ❌ GPU not visible
+# → Missing --gpus all OR toolkit not installed
+
+# ❌ Model not loading
+# → Check path: ./model/ag_news_model.pth
+
+
+# =============================================================================
+# ========================== ✅ FINAL NOTES ==================================
+# =============================================================================
+
+# ✔ CPU Dockerfile unchanged
+# ✔ GPU Dockerfile behaves IDENTICALLY
+# ✔ Only difference = CUDA base image + --gpus flag
+# ✔ Dependencies come ONLY from NFS
+# ✔ Model is inside container
