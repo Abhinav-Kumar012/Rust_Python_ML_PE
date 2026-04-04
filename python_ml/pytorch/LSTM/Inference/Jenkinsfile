@@ -65,15 +65,12 @@ post {
         archiveArtifacts artifacts: 'eval_metrics/lstm/**/*', allowEmptyArchive: true
     }
 }
-```
 
 }
 
 def buildImg(String image) {
 def t0 = System.currentTimeMillis()
 def status = 'SUCCESS'
-
-```
 try {
     sh """
         docker build \
@@ -90,7 +87,6 @@ try {
 
     sh """
         cat > ${METRICS_DIR}/${image}_build.json <<EOF
-```
 
 {
 "dimension": "1_cicd_build",
@@ -111,9 +107,7 @@ SB=$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
 LC=$(docker history -q ${image} 2>/dev/null | wc -l)
 SM=$(echo "scale=2; $SB / 1048576" | bc)
 
-```
     cat > ${METRICS_DIR}/${image}_image.json <<EOF
-```
 
 {
 "dimension": "2_image_size",
@@ -128,7 +122,6 @@ EOF
 
 def evaluate(String image, String port) {
 
-```
 sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
 
 sh """
