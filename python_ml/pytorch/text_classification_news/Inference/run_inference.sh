@@ -3,7 +3,7 @@
 # ==========================================
 # 1. Configuration
 # ==========================================
-IMAGE_NAME="text_classification_image"
+IMAGE_NAME="text_classification_image:gpu"
 CONTAINER_NAME="text_classification_container"
 HOST_PORT=8000
 CONTAINER_PORT=8000

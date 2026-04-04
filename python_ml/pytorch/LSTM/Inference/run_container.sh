@@ -9,12 +9,11 @@ HOST_PORT=8000
 CONTAINER_PORT=8000
 
 # Paths
-NFS_MOUNT_POINT="/mnt/lstm-libs"
+NFS_MOUNT_POINT="/mnt/LSTM-libs"
 CONTAINER_LIB_MOUNT="/external-libs"
 
 # Exact site-packages path
-PYTHON_LIB_PATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/python3.12/site-packages"
-
+PYTHON_LIB_PATH="$CONTAINER_LIB_MOUNT/LSTM_venv/lib/python3.12/site-packages"
 # ==========================================
 # 2. Pre-flight Checks
 # ==========================================

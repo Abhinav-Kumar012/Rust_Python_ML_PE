@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
 
     model = TextClassificationModel(Config())
 
-    model_path = "model_pytorch_text_classification/ag_news_model.pth"
+    model_path = "model/ag_news_model.pth"
 
     if not os.path.exists(model_path):
         raise RuntimeError(f"Model not found: {model_path}")
@@ -175,4 +175,5 @@ async def predict(request: PredictionRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=9050)  # ✅ match Locust
+    uvicorn.run(app, host="0.0.0.0", port=9050)  
+    print("Using GPU:", torch.cuda.is_available())

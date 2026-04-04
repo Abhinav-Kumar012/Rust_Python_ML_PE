@@ -3,7 +3,7 @@
 # ==========================================
 # 1. Configuration
 # ==========================================
-IMAGE_NAME="regression_image"
+IMAGE_NAME="regression_image:gpu"
 CONTAINER_NAME="regression_container"
 HOST_PORT=8000
 CONTAINER_PORT=8000
@@ -13,7 +13,7 @@ NFS_MOUNT_POINT="/mnt/regression-libs"
 CONTAINER_LIB_MOUNT="/external-libs"
 
 # FIXED: must match Dockerfile exactly
-PYTHON_LIB_PATH="$CONTAINER_LIB_MOUNT/regression_env/lib/python3.12/site-packages"
+PYTHON_LIB_PATH="$CONTAINER_LIB_MOUNT/regression_venv/lib/python3.12/site-packages"
 
 # ==========================================
 # 2. Pre-flight Checks

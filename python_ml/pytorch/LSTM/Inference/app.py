@@ -109,3 +109,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=9050)
+    print("Using GPU:", torch.cuda.is_available())
