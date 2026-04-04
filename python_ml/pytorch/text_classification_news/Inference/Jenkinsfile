@@ -34,35 +34,35 @@ pipeline {
             }
         }
 
-    stage('Prepare Model') {
-        steps {
-            sh """
-            set -e
+        stage('Prepare Model') {
+            steps {
+                sh """
+                set -e
 
-            MODEL_PATH=${BUILD_CTX}/model_pytorch_text_classification/ag_news_model.pth
+                MODEL_PATH=${BUILD_CTX}/model_pytorch_text_classification/ag_news_model.pth
 
-            mkdir -p ${BUILD_CTX}/model_pytorch_text_classification
+                mkdir -p ${BUILD_CTX}/model_pytorch_text_classification
 
-            if [ ! -f "\$MODEL_PATH" ]; then
-                echo "Downloading model..."
+                if [ ! -s "\$MODEL_PATH" ]; then
+                    echo "Downloading model..."
 
-                pip install -q gdown --break-system-packages
+                    rm -f "\$MODEL_PATH"
 
-                gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
-                    -O "\$MODEL_PATH"
-            else
-                echo "Model already exists"
-            fi
+                    pip install -q gdown --break-system-packages
 
-            echo "Verify model:"
-            ls -lh "\$MODEL_PATH"
+                    gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
+                        -O "\$MODEL_PATH"
+                else
+                    echo "Model already exists and looks valid"
+                fi
 
-            echo "File type:"
-            file "\$MODEL_PATH"
-            """
+                echo "Verify model:"
+                ls -lh "\$MODEL_PATH"
+                file "\$MODEL_PATH"
+                """
+            }
         }
-    }
-
+        
         stage('Build Image') {
             steps {
                 script {
