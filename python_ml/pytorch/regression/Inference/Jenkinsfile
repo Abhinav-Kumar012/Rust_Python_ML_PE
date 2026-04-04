@@ -54,7 +54,7 @@ pipeline {
 
             curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" > /tmp/gdrive.html
 
-            CONFIRM=$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+            CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
 
             curl -Lb /tmp/cookie \
                 "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=${FILE_ID}" \
