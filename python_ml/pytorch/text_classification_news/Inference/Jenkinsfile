@@ -36,29 +36,32 @@ pipeline {
 
     stage('Prepare Model') {
         steps {
-        sh """
-        mkdir -p ${BUILD_CTX}/model_pytorch_text_classification
-                if [ ! -f ${BUILD_CTX}/model_pytorch_text_classification/ag_news_model.pth ]; then
-                    echo "Downloading model from Google Drive..."
+            sh '''
+            set -e
 
-                    FILE_ID="1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC"
+            mkdir -p '"${BUILD_CTX}"'/model_pytorch_text_classification
 
-                    curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=\${FILE_ID}" > /tmp/gdrive.html
+            MODEL_PATH='"${BUILD_CTX}"'/model_pytorch_text_classification/ag_news_model.pth
 
-                    CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+            if [ ! -f "$MODEL_PATH" ]; then
+                echo "Downloading model from Google Drive..."
 
-                    curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
-                        -o ${BUILD_CTX}/model_pytorch_text_classification/ag_news_model.pth
+                pip install -q gdown
 
-                    rm -f /tmp/cookie /tmp/gdrive.html
+                gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
+                    -O "$MODEL_PATH"
 
-                else
-                    echo "Model already exists, skipping download"
-                fi
+                echo "Download complete"
+            else
+                echo "Model already exists, skipping download"
+            fi
 
-                echo "Downloaded files:"
-                ls -lh ${BUILD_CTX}/model_pytorch_text_classification
-            """
+            echo "Verifying model file..."
+            ls -lh "$MODEL_PATH"
+
+            echo "Checking file header (should NOT be HTML)..."
+            head -c 4 "$MODEL_PATH" | xxd
+            '''
         }
     }
 
