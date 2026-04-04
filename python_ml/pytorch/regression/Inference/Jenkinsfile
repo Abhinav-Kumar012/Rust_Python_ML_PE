@@ -36,37 +36,34 @@ pipeline {
 
     stage('Prepare Model') {
         steps {
-        sh """
-        mkdir -p ${BUILD_CTX}/generated
-        echo "Ensuring directory exists:"
-        ls -ld ${BUILD_CTX} || exit 1
+            sh """
+            set -e
 
-        echo "Creating model directory..."
-        mkdir -p ${BUILD_CTX}/generated
+            mkdir -p ${BUILD_CTX}/generated
 
-        echo "Directory contents after mkdir:"
-        ls -lh ${BUILD_CTX}
+            echo "Ensuring directory exists:"
+            ls -ld ${BUILD_CTX}
 
-        if [ ! -f ${BUILD_CTX}/generated/model.pt ]; then
-            echo "Downloading model..."
+            if [ ! -f ${BUILD_CTX}/generated/model.pt ]; then
+                echo "Downloading model..."
 
-            FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
+                FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
 
-            curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" > /tmp/gdrive.html
+                curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" > /tmp/gdrive.html
 
-            CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+                CONFIRM=\\\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
 
-            curl -Lb /tmp/cookie \
-                "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=${FILE_ID}" \
-                -o ${BUILD_CTX}/generated/model.pt
+                curl -Lb /tmp/cookie \
+                    "https://drive.google.com/uc?export=download&confirm=\\\$CONFIRM&id=${FILE_ID}" \
+                    -o ${BUILD_CTX}/generated/model.pt
 
-            rm -f /tmp/cookie /tmp/gdrive.html
-        else
-            echo "Model already exists"
-        fi
+                rm -f /tmp/cookie /tmp/gdrive.html
+            else
+                echo "Model already exists"
+            fi
 
-        echo "Final contents:"
-        ls -lh ${BUILD_CTX}/generated
+            echo "Final contents:"
+            ls -lh ${BUILD_CTX}/generated
             """
         }
     }
