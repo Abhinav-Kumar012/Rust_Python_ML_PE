@@ -2,7 +2,7 @@ pipeline {
 agent any
 
 environment {
-    BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/MNIST/Inference"
+    BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/mnist/Inference"
     METRICS_DIR    = "${WORKSPACE}/eval_metrics/mnist"
 
     MODEL_NAME     = "mnist"
