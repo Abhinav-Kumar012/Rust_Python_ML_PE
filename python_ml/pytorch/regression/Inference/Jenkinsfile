@@ -37,8 +37,8 @@ pipeline {
     stage('Prepare Model') {
         steps {
         sh """
-        mkdir -p ${BUILD_CTX}/regression_train_python
-                if [ ! -f ${BUILD_CTX}/regression_train_python/model.pt ]; then
+        mkdir -p ${BUILD_CTX}/generated
+                if [ ! -f ${BUILD_CTX}/generated/model.pt ]; then
                     echo "Downloading model from Google Drive..."
 
                     FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
@@ -48,7 +48,7 @@ pipeline {
                     CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
 
                     curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
-                        -o ${BUILD_CTX}/regression_train_python/model.pt
+                        -o ${BUILD_CTX}/generated/model.pt
 
                     rm -f /tmp/cookie /tmp/gdrive.html
 
