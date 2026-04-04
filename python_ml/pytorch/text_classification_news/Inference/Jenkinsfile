@@ -39,26 +39,18 @@ pipeline {
                 sh '''
                 set -e
 
-                mkdir -p '"${BUILD_CTX}"'/model_pytorch_text_classification
-
                 MODEL_PATH='"${BUILD_CTX}"'/model_pytorch_text_classification/ag_news_model.pth
 
-                if [ ! -f "$MODEL_PATH" ]; then
-                    echo "Downloading model..."
+                echo "Ensuring correct model file..."
 
-                    pip install -q gdown --break-system-packages
-
-                    gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
-                        -O "$MODEL_PATH"
-                else
-                    echo "Model already exists"
-                fi
-
-                echo "File details:"
                 ls -lh "$MODEL_PATH"
-
-                echo "File type:"
                 file "$MODEL_PATH"
+
+                echo "Forcing timestamp update to invalidate Docker layer..."
+                touch "$MODEL_PATH"
+
+                echo "Checksum:"
+                md5sum "$MODEL_PATH"
                 '''
             }
         }
@@ -101,7 +93,7 @@ def buildImg(String image) {
     def status = 'SUCCESS'
     try {
         sh """
-            docker build \
+            docker build --no-cache \
               -t ${image} \
               -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
               ${BUILD_CTX}
