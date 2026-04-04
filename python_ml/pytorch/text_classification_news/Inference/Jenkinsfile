@@ -46,21 +46,17 @@ pipeline {
             if [ ! -f "$MODEL_PATH" ]; then
                 echo "Downloading model from Google Drive..."
 
-                pip install -q gdown
+                pip install -q gdown --break-system-packages
 
                 gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
                     -O "$MODEL_PATH"
 
                 echo "Download complete"
             else
-                echo "Model already exists, skipping download"
+                echo "Model already exists"
             fi
 
-            echo "Verifying model file..."
             ls -lh "$MODEL_PATH"
-
-            echo "Checking file header (should NOT be HTML)..."
-            head -c 4 "$MODEL_PATH" | xxd
             '''
         }
     }
