@@ -3,7 +3,7 @@
 # ==========================================
 # 1. Configuration
 # ==========================================
-IMAGE_NAME="regression_image"
+IMAGE_NAME="regression_image:gpu"
 CONTAINER_NAME="regression_container"
 HOST_PORT=8000
 CONTAINER_PORT=8000
@@ -11,14 +11,14 @@ CONTAINER_PORT=8000
 # Paths
 NFS_MOUNT_POINT="/mnt/regression-libs"
 CONTAINER_LIB_MOUNT="/external-libs"
-# The exact path to site-packages within the mount
+
+# FIXED: must match Dockerfile exactly
 PYTHON_LIB_PATH="$CONTAINER_LIB_MOUNT/regression_venv/lib/python3.12/site-packages"
 
 # ==========================================
 # 2. Pre-flight Checks
 # ==========================================
 
-# Check if NFS libs are mounted
 if [ ! -d "$NFS_MOUNT_POINT" ] || [ -z "$(ls -A $NFS_MOUNT_POINT)" ]; then
    echo "⚠️  Warning: $NFS_MOUNT_POINT appears empty or unmounted."
    echo "Did you run ./mount_libs.sh?"
@@ -26,36 +26,33 @@ if [ ! -d "$NFS_MOUNT_POINT" ] || [ -z "$(ls -A $NFS_MOUNT_POINT)" ]; then
 fi
 
 # ==========================================
-# 3. Docker Execution
+# 3. Cleanup old container
 # ==========================================
 
-# Stop and remove existing container if it exists
 if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-    echo "Stopping removing existing container '$CONTAINER_NAME'..."
+    echo "Stopping and removing existing container..."
     docker stop "$CONTAINER_NAME" >/dev/null 2>&1
     docker rm "$CONTAINER_NAME" >/dev/null 2>&1
 fi
 
-echo "🚀 Starting inference container..."
+# ==========================================
+# 4. Run container (GPU enabled)
+# ==========================================
 
-# Run Command Explanation:
-# --gpus all        : Enable GPU access
-# -v ...            : Mount NFS libs and Model volume
-# -e PYTHONPATH...  : Point Python to the external libs
-# -p ...            : Expose API port
+echo "🚀 Starting inference container..."
 
 docker run -d \
   --name "$CONTAINER_NAME" \
   --gpus all \
-  -v "$NFS_MOUNT_POINT:$CONTAINER_LIB_MOUNT" \
-  -v regression_model_vol:/models \
+  -v "$NFS_MOUNT_POINT:$CONTAINER_LIB_MOUNT:ro" \
   -e PYTHONPATH="$PYTHON_LIB_PATH" \
   -p "$HOST_PORT:$CONTAINER_PORT" \
   "$IMAGE_NAME"
 
 # ==========================================
-# 4. Status
+# 5. Status
 # ==========================================
+
 if [ $? -eq 0 ]; then
     echo "✅ Container started successfully!"
     echo "📍 API available at: http://localhost:$HOST_PORT"

@@ -2,53 +2,52 @@ import os
 import sys
 import json
 import torch
-from torch.utils.data import DataLoader
+from fastapi import FastAPI, HTTPException
+from typing import List
+import contextlib
+import time
 
-# Add parent (LSTM/) to sys.path so shared modules are importable
+# Fix imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dataset import (
-    NUM_SEQUENCES, SEQ_LENGTH, NOISE_LEVEL,
-    SequenceDataset, collate_fn,
-)
 from model import LstmNetwork
 from config import TrainingConfig
 
+# ==========================================================
+# Globals
+# ==========================================================
+
+app = FastAPI()
+
+model = None
+device = None
+start_time = time.time()
 
 # ==========================================================
-# Inference  (mirrors inference.rs infer())
+# Lifespan (load once)
 # ==========================================================
 
-def infer(artifact_dir: str, device: torch.device) -> None:
-    """
-    Load a trained LstmNetwork and run inference on a validation dataset.
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    global model, device
 
-    Prints a predicted-vs-expected table (first 10 rows), mirroring the
-    Polars df! output in Rust's infer().
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-    Parameters
-    ----------
-    artifact_dir : str
-        Directory containing config.json and model.pt saved by training.py.
-    device : torch.device
-    """
+    artifact_dir = os.environ.get(
+        "ARTIFACT_DIR",
+        os.path.join("model", "lstm_train_python")
+    )
 
-    # ── Load config ─────────────────────────────────────────
+    # Load config
     config_path = os.path.join(artifact_dir, "config.json")
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(
-            f"Config not found at {config_path}. Run training first."
-        )
     with open(config_path) as f:
         config_dict = json.load(f)
+
     config = TrainingConfig(**config_dict)
 
-    # ── Load model ──────────────────────────────────────────
+    # Load model
     model_path = os.path.join(artifact_dir, "model.pt")
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(
-            f"Model not found at {model_path}. Run training first."
-        )
 
     model = LstmNetwork(
         input_size=config.input_size,
@@ -62,51 +61,52 @@ def infer(artifact_dir: str, device: torch.device) -> None:
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
-    # ── Build validation dataset (20% size — mirrors infer()) ──
-    dataset = SequenceDataset(NUM_SEQUENCES // 5, SEQ_LENGTH, NOISE_LEVEL)
+    yield
 
-    # Put all items in a single batch (mirrors Rust's single batch call)
-    loader = DataLoader(
-        dataset,
-        batch_size=len(dataset),
-        shuffle=False,
-        collate_fn=collate_fn,
-    )
+# attach lifespan
+app = FastAPI(lifespan=lifespan)
 
-    # ── Run inference ────────────────────────────────────────
-    with torch.no_grad():
-        sequences, targets = next(iter(loader))
-        sequences = sequences.to(device)   # (N, seq_len, 1)
-        targets   = targets.to(device)     # (N, 1)
+# ==========================================================
+# Endpoint
+# ==========================================================
 
-        predicted = model(sequences, None)  # (N, 1)
+@app.post("/predict")
+async def predict(sequence: List[float]):
+    try:
+        t0 = time.perf_counter()
 
-    predicted_vals = predicted.squeeze(1).cpu().tolist()   # [N]
-    expected_vals  = targets.squeeze(1).cpu().tolist()     # [N]
+        if len(sequence) == 0:
+            raise ValueError("Empty sequence")
 
-    # ── Print table (mirrors Polars df![] output) ─────────────
-    col_w = 14
-    header = f"{'predicted':>{col_w}} {'expected':>{col_w}}"
-    sep    = "-" * len(header)
+        # Convert → tensor (1, seq_len, 1)
+        x = torch.tensor(sequence, dtype=torch.float32)
+        x = x.unsqueeze(0).unsqueeze(-1).to(device)
 
-    print(sep)
-    print(header)
-    print(sep)
-    for pred, exp in zip(predicted_vals[:10], expected_vals[:10]):
-        print(f"{pred:>{col_w}.6f} {exp:>{col_w}.6f}")
-    print(sep)
+        with torch.no_grad():
+            output = model(x, None)
 
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+
+        prediction = float(output.squeeze().item())
+
+        latency_ms = (time.perf_counter() - t0) * 1000
+
+        return {
+            "prediction": prediction,
+            "latency_ms": latency_ms,
+            "uptime_sec": time.time() - start_time
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================================
 # Entry
 # ==========================================================
 
 if __name__ == "__main__":
-    # Allow the artifact directory to be configured via an environment variable
-    # so the Docker container can override it at runtime (e.g. -e ARTIFACT_DIR=…).
-    ARTIFACT_DIR = os.environ.get("ARTIFACT_DIR", os.path.join("model", "lstm_train_python"))
+    import uvicorn
 
-    infer(
-        artifact_dir=ARTIFACT_DIR,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    )
+    uvicorn.run(app, host="0.0.0.0", port=9050)
+    print("Using GPU:", torch.cuda.is_available())

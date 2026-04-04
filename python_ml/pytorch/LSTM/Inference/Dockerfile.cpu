@@ -17,9 +17,16 @@ RUN apt-get update && apt-get install -y \
 
 # Copy application code
 COPY app.py ./
+COPY model.py ./
+COPY config.py ./
+COPY dataset.py ./
+
 
 # Copy model INSIDE container (from generated/ output dir)
 COPY lstm_train_python/model.pt ./generated/model.pt
+COPY lstm_train_python/model.pt ./model/lstm_train_python/model.pt
+COPY lstm_train_python/config.json ./model/lstm_train_python/config.json
+
 
 EXPOSE 8000
 
