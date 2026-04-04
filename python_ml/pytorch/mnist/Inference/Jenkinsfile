@@ -1,0 +1,139 @@
+pipeline {
+agent any
+
+environment {
+    BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/MNIST/Inference"
+    METRICS_DIR    = "${WORKSPACE}/eval_metrics/mnist"
+
+    MODEL_NAME     = "mnist"
+    IMAGE_GPU      = "mnist-inference:gpu"
+
+    DOCKERFILE_GPU = "Dockerfile.gpu"
+
+    NFS_LIBS_HOST  = "/mnt/MNIST-libs"
+    NFS_LIBS_CONT  = "/external-libs"
+    PY_LIB_PATH    = "/external-libs/MNIST_venv/lib/python3.12/site-packages"
+
+    CONTAINER_NAME = "eval-mnist"
+    CONTAINER_PORT = "8000"
+    EVAL_PORT      = "9050"
+
+    PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+}
+
+stages {
+
+    stage('Setup') {
+        steps {
+            sh """
+                mkdir -p ${METRICS_DIR}
+                echo "Build context: ${BUILD_CTX}"
+                ls -R ${BUILD_CTX}
+            """
+        }
+    }
+
+    stage('Prepare Model') {
+        steps {
+            sh """
+                if [ ! -f ${BUILD_CTX}/model.pt ]; then
+                    echo "Downloading MNIST model..."
+
+                    FILE_ID="1tfnBvcwBsTO8o1yFNCFuqYECe62Q-MvB"
+
+                    curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=\${FILE_ID}" > /tmp/gdrive.html
+
+                    CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+
+                    curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
+                        -o ${BUILD_CTX}/model.pt
+
+                    rm -f /tmp/cookie /tmp/gdrive.html
+                else
+                    echo "Model already exists"
+                fi
+
+                ls -lh ${BUILD_CTX}
+            """
+        }
+    }
+
+    stage('Build Image') {
+        steps {
+            script {
+                buildImg(IMAGE_GPU)
+            }
+        }
+    }
+
+    stage('Evaluate') {
+        steps {
+            script {
+                evaluate(IMAGE_GPU, EVAL_PORT)
+            }
+        }
+    }
+}
+
+post {
+    always {
+        sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+        archiveArtifacts artifacts: 'eval_metrics/mnist/**/*', allowEmptyArchive: true
+    }
+}
+
+}
+
+def buildImg(String image) {
+sh """
+docker build 
+-t ${image} 
+-f ${BUILD_CTX}/${DOCKERFILE_GPU} 
+${BUILD_CTX}
+"""
+}
+
+def evaluate(String image, String port) {
+
+sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+sh """
+    if docker info --format '{{json .Runtimes}}' | grep -q nvidia; then
+        GPU_ARGS="--gpus all"
+    else
+        GPU_ARGS=""
+    fi
+
+    docker run -d \
+        --name ${CONTAINER_NAME} \
+        \$GPU_ARGS \
+        -v ${NFS_LIBS_HOST}:${NFS_LIBS_CONT}:ro \
+        -e PYTHONPATH=${PY_LIB_PATH} \
+        -p ${port}:${CONTAINER_PORT} \
+        ${image}
+
+    echo "Waiting for app..."
+
+    for i in \$(seq 1 200); do
+        if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
+            echo "App ready ✅"
+            exit 0
+        fi
+        sleep 0.1
+    done
+
+    echo "App failed ❌"
+    docker logs ${CONTAINER_NAME}
+    exit 1
+"""
+
+sh """
+    curl -sf -X POST http://localhost:${port}/predict \
+        -H 'Content-Type: application/json' \
+        -d '[0.1,0.2,0.3,0.5,0.8]' \
+        | python3 -m json.tool || true
+"""
+
+sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+}
