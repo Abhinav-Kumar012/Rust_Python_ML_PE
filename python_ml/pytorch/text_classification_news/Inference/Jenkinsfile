@@ -56,7 +56,14 @@ pipeline {
                 echo "Model already exists"
             fi
 
+            echo "File details:"
             ls -lh "$MODEL_PATH"
+
+            echo "File type check:"
+            file "$MODEL_PATH"
+
+            echo "First bytes (should NOT be HTML):"
+            head -c 20 "$MODEL_PATH"
             '''
         }
     }
