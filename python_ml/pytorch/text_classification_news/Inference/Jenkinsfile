@@ -36,22 +36,27 @@ pipeline {
 
         stage('Prepare Model') {
             steps {
-                sh '''
+                sh """
                 set -e
 
-                MODEL_PATH='"${BUILD_CTX}"'/model_pytorch_text_classification/ag_news_model.pth
+                MODEL_PATH=${BUILD_CTX}/model_pytorch_text_classification/ag_news_model.pth
 
-                echo "Ensuring correct model file..."
+                mkdir -p ${BUILD_CTX}/model_pytorch_text_classification
 
+                if [ ! -f "$MODEL_PATH" ]; then
+                    echo "Downloading model..."
+
+                    pip install -q gdown --break-system-packages
+
+                    gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
+                        -O "$MODEL_PATH"
+                else
+                    echo "Model already exists"
+                fi
+
+                echo "Verify model:"
                 ls -lh "$MODEL_PATH"
-                file "$MODEL_PATH"
-
-                echo "Forcing timestamp update to invalidate Docker layer..."
-                touch "$MODEL_PATH"
-
-                echo "Checksum:"
-                md5sum "$MODEL_PATH"
-                '''
+                """
             }
         }
 
