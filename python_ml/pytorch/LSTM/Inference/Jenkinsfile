@@ -1,215 +1,196 @@
-/*
- * LSTM — Inference Evaluation Pipeline
- */
 pipeline {
-    agent any
+agent any
 
-    environment {
-        BUILD_CTX      = "${WORKSPACE}"
-        METRICS_DIR    = "${WORKSPACE}/eval_metrics/lstm"
+```
+environment {
+    // ✅ FIXED build context
+    BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/LSTM/Inference"
 
-        MODEL_NAME     = "lstm"
-        IMAGE_GPU      = "lstm-inference:gpu"
+    METRICS_DIR    = "${WORKSPACE}/eval_metrics/lstm"
 
-        DOCKERFILE_GPU = "python_ml/pytorch/LSTM/Inference/Dockerfile.gpu"
-        NFS_LIBS_HOST  = "/mnt/LSTM-libs"
-        NFS_LIBS_CONT  = "/external-libs"
-        PY_LIB_PATH    = "/external-libs/LSTM_venv/lib/python3.12/site-packages"
+    MODEL_NAME     = "lstm"
+    IMAGE_GPU      = "lstm-inference:gpu"
 
-        CONTAINER_NAME = "eval-lstm"
-        CONTAINER_PORT = "8000"
-        EVAL_PORT      = "9050"
+    DOCKERFILE_GPU = "Dockerfile.gpu"
 
-        PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+    NFS_LIBS_HOST  = "/mnt/LSTM-libs"
+    NFS_LIBS_CONT  = "/external-libs"
+    PY_LIB_PATH    = "/external-libs/LSTM_venv/lib/python3.12/site-packages"
+
+    CONTAINER_NAME = "eval-lstm"
+    CONTAINER_PORT = "8000"
+    EVAL_PORT      = "9050"
+
+    PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+}
+
+stages {
+
+    stage('Setup') {
+        steps {
+            sh """
+                mkdir -p ${METRICS_DIR}
+                echo "Workspace: ${WORKSPACE}"
+                echo "Build context: ${BUILD_CTX}"
+                ls -R ${BUILD_CTX}
+            """
+        }
     }
 
-    stages {
-        stage('Setup') {
-            steps {
-                sh "mkdir -p ${METRICS_DIR}"
-            }
-        }
-
-        stage('Build Image') {
-            steps {
-                script {
-                    buildImg(IMAGE_GPU, DOCKERFILE_GPU)
-                }
-            }
-        }
-
-        stage('Image Metrics') {
-            steps {
-                script {
-                    measureImg(IMAGE_GPU)
-                }
-            }
-        }
-
-        stage('Evaluate') {
-            steps {
-                script {
-                    evaluate(IMAGE_GPU, EVAL_PORT)
-                }
+    stage('Build Image') {
+        steps {
+            script {
+                buildImg(IMAGE_GPU)
             }
         }
     }
 
-    post {
-        always {
-            sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+    stage('Image Metrics') {
+        steps {
+            script {
+                measureImg(IMAGE_GPU)
+            }
+        }
+    }
 
-            archiveArtifacts artifacts: 'eval_metrics/lstm/**/*', allowEmptyArchive: true
+    stage('Evaluate') {
+        steps {
+            script {
+                evaluate(IMAGE_GPU, EVAL_PORT)
+            }
         }
     }
 }
 
-def buildImg(String image, String dockerfile) {
-    def t0 = System.currentTimeMillis()
-    def status = 'SUCCESS'
+post {
+    always {
+        sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+        archiveArtifacts artifacts: 'eval_metrics/lstm/**/*', allowEmptyArchive: true
+    }
+}
+```
 
-    try {
-        sh "docker build -t ${image} -f ${dockerfile} ${BUILD_CTX}"
-    } catch (Exception e) {
-        status = 'FAILURE'
-        throw e
-    } finally {
-        def dur = System.currentTimeMillis() - t0
-        def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+}
 
-        sh """
-            cat > ${METRICS_DIR}/${image}_build.json <<EOF
+def buildImg(String image) {
+def t0 = System.currentTimeMillis()
+def status = 'SUCCESS'
+
+```
+try {
+    sh """
+        docker build \
+          -t ${image} \
+          -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
+          ${BUILD_CTX}
+    """
+} catch (Exception e) {
+    status = 'FAILURE'
+    throw e
+} finally {
+    def dur = System.currentTimeMillis() - t0
+    def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+    sh """
+        cat > ${METRICS_DIR}/${image}_build.json <<EOF
+```
+
 {
-  "dimension": "1_cicd_build",
-  "model": "${MODEL_NAME}",
-  "image": "${image}",
-  "status": "${status}",
-  "build_duration_ms": ${dur},
-  "timestamp": "${ts}"
+"dimension": "1_cicd_build",
+"model": "${MODEL_NAME}",
+"image": "${image}",
+"status": "${status}",
+"build_duration_ms": ${dur},
+"timestamp": "${ts}"
 }
 EOF
-        """
-    }
+"""
+}
 }
 
 def measureImg(String image) {
-    sh """
-        SB=\$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
-        LC=\$(docker history -q ${image} 2>/dev/null | wc -l)
-        SM=\$(echo "scale=2; \$SB / 1048576" | bc)
+sh """
+SB=$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
+LC=$(docker history -q ${image} 2>/dev/null | wc -l)
+SM=$(echo "scale=2; $SB / 1048576" | bc)
 
-        cat > ${METRICS_DIR}/${image}_image.json <<EOF
+```
+    cat > ${METRICS_DIR}/${image}_image.json <<EOF
+```
+
 {
-  "dimension": "2_image_size",
-  "image": "${image}",
-  "size_bytes": \$SB,
-  "size_mb": \$SM,
-  "layers": \$LC
+"dimension": "2_image_size",
+"image": "${image}",
+"size_bytes": $SB,
+"size_mb": $SM,
+"layers": $LC
 }
 EOF
-    """
+"""
 }
 
 def evaluate(String image, String port) {
 
-    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+```
+sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
 
-    sh """
-        T0=\$(date +%s%3N)
+sh """
+    T0=\$(date +%s%3N)
 
-        if [ ! -d ${NFS_LIBS_HOST} ] || [ -z "\$(ls -A ${NFS_LIBS_HOST} 2>/dev/null || true)" ]; then
-            echo "Required external libs mount not available at ${NFS_LIBS_HOST}"
-            exit 1
+    if [ ! -d ${NFS_LIBS_HOST} ] || [ -z "\$(ls -A ${NFS_LIBS_HOST} 2>/dev/null || true)" ]; then
+        echo "Required external libs mount not available at ${NFS_LIBS_HOST}"
+        exit 1
+    fi
+
+    if docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia; then
+        GPU_ARGS="--gpus all"
+    else
+        GPU_ARGS=""
+    fi
+
+    docker run -d \
+        --name ${CONTAINER_NAME} \
+        \$GPU_ARGS \
+        -v ${NFS_LIBS_HOST}:${NFS_LIBS_CONT}:ro \
+        -e PYTHONPATH=${PY_LIB_PATH} \
+        -p ${port}:${CONTAINER_PORT} \
+        -v ${METRICS_DIR}:/app/devops_metrics \
+        ${image}
+
+    T1=\$(date +%s%3N)
+
+    echo "Waiting for app readiness..."
+
+    READY=0
+    for i in \$(seq 1 300); do
+        if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
+            READY=1
+            break
         fi
+        sleep 0.1
+    done
 
-        if docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia; then
-            GPU_ARGS="--gpus all"
-        else
-            GPU_ARGS=""
-        fi
+    T2=\$(date +%s%3N)
 
-        docker run -d \
-            --name ${CONTAINER_NAME} \
-            \$GPU_ARGS \
-            -v ${NFS_LIBS_HOST}:${NFS_LIBS_CONT}:ro \
-            -e PYTHONPATH=${PY_LIB_PATH} \
-            -p ${port}:${CONTAINER_PORT} \
-            -v ${METRICS_DIR}:/app/devops_metrics \
-            ${image}
+    if [ "\$READY" -ne 1 ]; then
+        echo "App not ready"
+        docker logs ${CONTAINER_NAME} || true
+        exit 1
+    fi
 
-        T1=\$(date +%s%3N)
+    echo "App is ready ✅"
+"""
 
-        echo "Container launched, waiting for readiness..."
+sh """
+    curl -sf -X POST http://localhost:${port}/predict \
+        -H 'Content-Type: application/json' \
+        -d '[0.1,0.2,0.3,0.5,0.8,1.3,2.1,3.4,5.5,8.9]' \
+        | python3 -m json.tool > ${METRICS_DIR}/predict_response.json || echo '{}' > ${METRICS_DIR}/predict_response.json
 
-        READY=0
+    docker stats --no-stream ${CONTAINER_NAME} > ${METRICS_DIR}/docker_stats.txt || true
+"""
 
-        for i in \$(seq 1 300); do
-            HEALTH_STATUS=\$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${CONTAINER_NAME} 2>/dev/null || echo "missing")
+sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+```
 
-            if [ "\$HEALTH_STATUS" = "healthy" ]; then
-                READY=1
-                break
-            fi
-
-            if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
-                READY=1
-                break
-            fi
-
-            sleep 0.1
-        done
-
-        T2=\$(date +%s%3N)
-
-        CONTAINER_START_MS=\$((T1 - T0))
-        APP_READY_MS=\$((T2 - T1))
-        TOTAL_COLD_START_MS=\$((T2 - T0))
-
-        if [ "\$READY" -eq 1 ]; then
-                        API_DOC_PAYLOAD=\$(curl -sf http://localhost:${port}/openapi.json 2>/dev/null || echo '{}')
-
-            cat > ${METRICS_DIR}/cold_start.json <<EOF
-{
-  "dimension": "3_cold_start",
-  "model": "${MODEL_NAME}",
-  "container_start_ms": \$CONTAINER_START_MS,
-  "app_ready_ms": \$APP_READY_MS,
-  "total_cold_start_ms": \$TOTAL_COLD_START_MS,
-    "openapi_status": \$API_DOC_PAYLOAD
-}
-EOF
-
-            echo "Container start: \${CONTAINER_START_MS}ms"
-            echo "App ready: \${APP_READY_MS}ms"
-            echo "Total cold start: \${TOTAL_COLD_START_MS}ms"
-        else
-            cat > ${METRICS_DIR}/cold_start.json <<EOF
-{
-  "dimension": "3_cold_start",
-  "model": "${MODEL_NAME}",
-  "container_start_ms": \$CONTAINER_START_MS,
-  "app_ready_ms": -1,
-  "total_cold_start_ms": -1,
-  "error": "Application did not become ready within timeout"
-}
-EOF
-
-            echo "Application failed to become ready within timeout"
-            docker logs ${CONTAINER_NAME} || true
-            exit 1
-        fi
-    """
-
-    sh """
-        curl -sf -X POST http://localhost:${port}/predict \
-            -H 'Content-Type: application/json' \
-            -d '[0.1,0.2,0.3,0.5,0.8,1.3,2.1,3.4,5.5,8.9]' \
-            | python3 -m json.tool > ${METRICS_DIR}/predict_response.json || echo '{}' > ${METRICS_DIR}/predict_response.json
-
-        docker stats --no-stream --format '{"dimension":"5_resources","cpu":"{{.CPUPerc}}","mem":"{{.MemUsage}}"}' ${CONTAINER_NAME} > ${METRICS_DIR}/docker_stats.json || true
-
-        docker inspect ${CONTAINER_NAME} > ${METRICS_DIR}/container_inspect.json || true
-    """
-
-    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
 }
