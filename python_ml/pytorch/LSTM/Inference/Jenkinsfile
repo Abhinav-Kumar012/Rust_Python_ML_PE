@@ -34,35 +34,33 @@ pipeline {
             }
         }
 
-        stage('Prepare Model') {
-            steps {
-            sh """
-            mkdir -p ${BUILD_CTX}/lstm_train_python
+    stage('Prepare Model') {
+        steps {
+        sh """
+        mkdir -p ${BUILD_CTX}/lstm_train_python
+                if [ ! -f ${BUILD_CTX}/lstm_train_python/model.pt ]; then
+                    echo "Downloading model from Google Drive..."
 
-            ```
-                    if [ ! -f ${BUILD_CTX}/lstm_train_python/model.pt ]; then
-                        echo "Downloading model from Google Drive..."
+                    FILE_ID="1zOvWwwXaVg2NXGpL0lAN2gclygNNlbQb"
 
-                        FILE_ID="1zOvWwwXaVg2NXGpL0lAN2gclygNNlbQb"
+                    curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=\${FILE_ID}" > /tmp/gdrive.html
 
-                        curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" > /tmp/gdrive.html
+                    CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
 
-                        CONFIRM=$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+                    curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
+                        -o ${BUILD_CTX}/lstm_train_python/model.pt
 
-                        curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=${FILE_ID}" \
-                            -o ${BUILD_CTX}/lstm_train_python/model.pt
+                    rm -f /tmp/cookie /tmp/gdrive.html
 
-                        rm -f /tmp/cookie /tmp/gdrive.html
+                else
+                    echo "Model already exists, skipping download"
+                fi
 
-                    else
-                        echo "Model already exists, skipping download"
-                    fi
-
-                    echo "Downloaded files:"
-                    ls -lh ${BUILD_CTX}/lstm_train_python
-                """
-            }
+                echo "Downloaded files:"
+                ls -lh ${BUILD_CTX}/lstm_train_python
+            """
         }
+    }
 
 
         stage('Build Image') {
