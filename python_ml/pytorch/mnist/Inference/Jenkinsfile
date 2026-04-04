@@ -85,12 +85,12 @@ post {
 }
 
 def buildImg(String image) {
-sh """
-docker build 
--t ${image} 
--f ${BUILD_CTX}/${DOCKERFILE_GPU} 
-${BUILD_CTX}
-"""
+    sh """
+    docker build \
+    -t ${image} \
+    -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
+    ${BUILD_CTX}
+    """
 }
 
 def evaluate(String image, String port) {
