@@ -1,11 +1,8 @@
 pipeline {
 agent any
 
-```
 environment {
-    // ✅ FIXED build context
     BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/LSTM/Inference"
-
     METRICS_DIR    = "${WORKSPACE}/eval_metrics/lstm"
 
     MODEL_NAME     = "lstm"
@@ -135,8 +132,6 @@ def evaluate(String image, String port) {
 sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
 
 sh """
-    T0=\$(date +%s%3N)
-
     if [ ! -d ${NFS_LIBS_HOST} ] || [ -z "\$(ls -A ${NFS_LIBS_HOST} 2>/dev/null || true)" ]; then
         echo "Required external libs mount not available at ${NFS_LIBS_HOST}"
         exit 1
@@ -157,28 +152,19 @@ sh """
         -v ${METRICS_DIR}:/app/devops_metrics \
         ${image}
 
-    T1=\$(date +%s%3N)
-
     echo "Waiting for app readiness..."
 
-    READY=0
     for i in \$(seq 1 300); do
         if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
-            READY=1
-            break
+            echo "App ready ✅"
+            exit 0
         fi
         sleep 0.1
     done
 
-    T2=\$(date +%s%3N)
-
-    if [ "\$READY" -ne 1 ]; then
-        echo "App not ready"
-        docker logs ${CONTAINER_NAME} || true
-        exit 1
-    fi
-
-    echo "App is ready ✅"
+    echo "App not ready ❌"
+    docker logs ${CONTAINER_NAME} || true
+    exit 1
 """
 
 sh """
@@ -186,11 +172,9 @@ sh """
         -H 'Content-Type: application/json' \
         -d '[0.1,0.2,0.3,0.5,0.8,1.3,2.1,3.4,5.5,8.9]' \
         | python3 -m json.tool > ${METRICS_DIR}/predict_response.json || echo '{}' > ${METRICS_DIR}/predict_response.json
-
-    docker stats --no-stream ${CONTAINER_NAME} > ${METRICS_DIR}/docker_stats.txt || true
 """
 
 sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
-```
+
 
 }
