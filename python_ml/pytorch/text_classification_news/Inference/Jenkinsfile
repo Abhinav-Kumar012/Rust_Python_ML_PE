@@ -121,10 +121,10 @@ def buildImg(String image) {
     def status = 'SUCCESS'
     try {
         sh """
-            docker build \
-              -t ${image} \
-              -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
-              ${BUILD_CTX}
+            docker build --no-cache \
+            -t ${image} \
+            -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
+            ${BUILD_CTX}
         """
     } catch (Exception e) {
         status = 'FAILURE'
