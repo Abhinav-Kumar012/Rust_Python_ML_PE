@@ -1,0 +1,197 @@
+pipeline {
+    agent any
+
+    environment {
+        BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/regression/Inference"
+        METRICS_DIR    = "${WORKSPACE}/eval_metrics/regression"
+
+        MODEL_NAME     = "regression"
+        IMAGE_GPU      = "regression-inference:gpu"
+
+        DOCKERFILE_GPU = "Dockerfile.gpu"
+
+        NFS_LIBS_HOST  = "/mnt/regression-libs"
+        NFS_LIBS_CONT  = "/external-libs"
+        PY_LIB_PATH    = "/external-libs/regression_venv/lib/python3.12/site-packages"
+
+        CONTAINER_NAME = "eval-regression"
+        CONTAINER_PORT = "8000"
+        EVAL_PORT      = "9050"
+
+        PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+    }
+
+    stages {
+
+        stage('Setup') {
+            steps {
+                sh """
+                    mkdir -p ${METRICS_DIR}
+                    echo "Workspace: ${WORKSPACE}"
+                    echo "Build context: ${BUILD_CTX}"
+                    ls -R ${BUILD_CTX}
+                """
+            }
+        }
+
+    stage('Prepare Model') {
+        steps {
+        sh """
+        mkdir -p ${BUILD_CTX}/regression_train_python
+                if [ ! -f ${BUILD_CTX}/regression_train_python/model.pt ]; then
+                    echo "Downloading model from Google Drive..."
+
+                    FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
+
+                    curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=\${FILE_ID}" > /tmp/gdrive.html
+
+                    CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+
+                    curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
+                        -o ${BUILD_CTX}/regression_train_python/model.pt
+
+                    rm -f /tmp/cookie /tmp/gdrive.html
+
+                else
+                    echo "Model already exists, skipping download"
+                fi
+
+                echo "Downloaded files:"
+                ls -lh ${BUILD_CTX}/regression_train_python
+            """
+        }
+    }
+
+
+        stage('Build Image') {
+            steps {
+                script {
+                    buildImg(IMAGE_GPU)
+                }
+            }
+        }
+
+        stage('Image Metrics') {
+            steps {
+                script {
+                    measureImg(IMAGE_GPU)
+                }
+            }
+        }
+
+        stage('Evaluate') {
+            steps {
+                script {
+                    evaluate(IMAGE_GPU, EVAL_PORT)
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+            archiveArtifacts artifacts: 'eval_metrics/regression/**/*', allowEmptyArchive: true
+        }
+    }
+}
+
+def buildImg(String image) {
+    def t0 = System.currentTimeMillis()
+    def status = 'SUCCESS'
+    try {
+        sh """
+            docker build \
+              -t ${image} \
+              -f ${BUILD_CTX}/${DOCKERFILE_GPU} \
+              ${BUILD_CTX}
+        """
+    } catch (Exception e) {
+        status = 'FAILURE'
+        throw e
+    } finally {
+        def dur = System.currentTimeMillis() - t0
+        def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+        sh """
+            cat > ${METRICS_DIR}/${image}_build.json <<EOF
+{
+"dimension": "1_cicd_build",
+"model": "${MODEL_NAME}",
+"image": "${image}",
+"status": "${status}",
+"build_duration_ms": ${dur},
+"timestamp": "${ts}"
+}
+EOF
+        """
+    }
+}
+
+def measureImg(String image) {
+    sh """
+        SB=\$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
+        LC=\$(docker history -q ${image} 2>/dev/null | wc -l)
+        SM=\$(echo "scale=2; \$SB / 1048576" | bc)
+
+        cat > ${METRICS_DIR}/${image}_image.json <<EOF
+{
+"dimension": "2_image_size",
+"image": "${image}",
+"size_bytes": \$SB,
+"size_mb": \$SM,
+"layers": \$LC
+}
+EOF
+    """
+}
+
+def evaluate(String image, String port) {
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+    sh """
+        if [ ! -d ${NFS_LIBS_HOST} ] || [ -z "\$(ls -A ${NFS_LIBS_HOST} 2>/dev/null || true)" ]; then
+            echo "Required external libs mount not available at ${NFS_LIBS_HOST}"
+            exit 1
+        fi
+
+        if docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q nvidia; then
+            GPU_ARGS="--gpus all"
+        else
+            GPU_ARGS=""
+        fi
+
+        docker run -d \
+            --name ${CONTAINER_NAME} \
+            \$GPU_ARGS \
+            -v ${NFS_LIBS_HOST}:${NFS_LIBS_CONT}:ro \
+            -e PYTHONPATH=${PY_LIB_PATH} \
+            -p ${port}:${CONTAINER_PORT} \
+            -v ${METRICS_DIR}:/app/devops_metrics \
+            ${image}
+
+        echo "Waiting for app readiness..."
+
+        for i in \$(seq 1 300); do
+            if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
+                echo "App ready ✅"
+                exit 0
+            fi
+            sleep 0.1
+        done
+
+        echo "App not ready ❌"
+        docker logs ${CONTAINER_NAME} || true
+        exit 1
+    """
+
+    sh """
+        curl -sf -X POST http://localhost:${port}/predict \
+            -H 'Content-Type: application/json' \
+            -d '[0.1,0.2,0.3,0.5,0.8,1.3,2.1,3.4,5.5,8.9]' \
+            | python3 -m json.tool > ${METRICS_DIR}/predict_response.json || echo '{}' > ${METRICS_DIR}/predict_response.json
+    """
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+}
