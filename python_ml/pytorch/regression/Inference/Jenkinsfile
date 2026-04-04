@@ -38,26 +38,35 @@ pipeline {
         steps {
         sh """
         mkdir -p ${BUILD_CTX}/generated
-                if [ ! -f ${BUILD_CTX}/generated/model.pt ]; then
-                    echo "Downloading model from Google Drive..."
+        echo "Ensuring directory exists:"
+        ls -ld ${BUILD_CTX} || exit 1
 
-                    FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
+        echo "Creating model directory..."
+        mkdir -p ${BUILD_CTX}/generated
 
-                    curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=\${FILE_ID}" > /tmp/gdrive.html
+        echo "Directory contents after mkdir:"
+        ls -lh ${BUILD_CTX}
 
-                    CONFIRM=\$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
+        if [ ! -f ${BUILD_CTX}/generated/model.pt ]; then
+            echo "Downloading model..."
 
-                    curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=\$CONFIRM&id=\${FILE_ID}" \
-                        -o ${BUILD_CTX}/generated/model.pt
+            FILE_ID="1icaX8JzbF1m7GQJgvz6MaxhIBBsdK3Tw"
 
-                    rm -f /tmp/cookie /tmp/gdrive.html
+            curl -c /tmp/cookie -L "https://drive.google.com/uc?export=download&id=${FILE_ID}" > /tmp/gdrive.html
 
-                else
-                    echo "Model already exists, skipping download"
-                fi
+            CONFIRM=$(grep -o 'confirm=[^&]*' /tmp/gdrive.html | sed 's/confirm=//')
 
-                echo "Downloaded files:"
-                ls -lh ${BUILD_CTX}/regression_train_python
+            curl -Lb /tmp/cookie \
+                "https://drive.google.com/uc?export=download&confirm=$CONFIRM&id=${FILE_ID}" \
+                -o ${BUILD_CTX}/generated/model.pt
+
+            rm -f /tmp/cookie /tmp/gdrive.html
+        else
+            echo "Model already exists"
+        fi
+
+        echo "Final contents:"
+        ls -lh ${BUILD_CTX}/generated
             """
         }
     }
