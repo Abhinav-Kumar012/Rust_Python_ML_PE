@@ -44,14 +44,12 @@ pipeline {
             MODEL_PATH='"${BUILD_CTX}"'/model_pytorch_text_classification/ag_news_model.pth
 
             if [ ! -f "$MODEL_PATH" ]; then
-                echo "Downloading model from Google Drive..."
+                echo "Downloading model..."
 
                 pip install -q gdown --break-system-packages
 
                 gdown --id 1p9wB5sKQURMLrh_BDIJqUcXGiUhZ8pcC \
                     -O "$MODEL_PATH"
-
-                echo "Download complete"
             else
                 echo "Model already exists"
             fi
@@ -59,11 +57,27 @@ pipeline {
             echo "File details:"
             ls -lh "$MODEL_PATH"
 
-            echo "File type check:"
+            echo "File type:"
             file "$MODEL_PATH"
 
-            echo "First bytes (should NOT be HTML):"
-            head -c 20 "$MODEL_PATH"
+            # 🔥 ADD THIS PART
+            if file "$MODEL_PATH" | grep -q "Zip archive"; then
+                echo "Model is ZIP → extracting..."
+
+                unzip -o "$MODEL_PATH" -d "$(dirname "$MODEL_PATH")/extracted"
+
+                FOUND_MODEL=$(find "$(dirname "$MODEL_PATH")/extracted" -name "*.pth" | head -n 1)
+
+                if [ -n "$FOUND_MODEL" ]; then
+                    cp "$FOUND_MODEL" "$MODEL_PATH"
+                else
+                    echo "No valid .pth found"
+                    exit 1
+                fi
+            fi
+
+            echo "Final model check:"
+            file "$MODEL_PATH"
             '''
         }
     }
