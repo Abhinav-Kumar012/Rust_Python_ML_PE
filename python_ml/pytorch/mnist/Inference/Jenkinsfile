@@ -1,0 +1,205 @@
+pipeline {
+    agent any
+
+    environment {
+        BUILD_CTX      = "${WORKSPACE}/python_ml/pytorch/mnist/Inference"
+        METRICS_DIR    = "${WORKSPACE}/eval_metrics/mnist"
+
+        MODEL_NAME     = "mnist"
+        IMAGE_GPU      = "mnist-inference:gpu"
+
+        DOCKERFILE_GPU = "Dockerfile.gpu"
+
+        NFS_LIBS_HOST  = "/mnt/MNIST-libs"
+        NFS_LIBS_CONT  = "/external-libs"
+        PY_LIB_PATH    = "/external-libs/MNIST_venv/lib/python3.12/site-packages"
+
+        CONTAINER_NAME = "eval-mnist"
+        CONTAINER_PORT = "8000"
+        EVAL_PORT      = "9050"
+
+        PATH = "/var/lib/jenkins/.local/bin:/home/ajitesh/.local/bin:${env.PATH}"
+    }
+
+    stages {
+
+        stage('Setup') {
+            steps {
+                sh """
+                    mkdir -p ${METRICS_DIR}
+                    echo "Build context: ${BUILD_CTX}"
+                    ls -R ${BUILD_CTX}
+                """
+            }
+        }
+
+        stage('Prepare Model') {
+            steps {
+                sh """
+                    if [ ! -f ${BUILD_CTX}/model.pt ]; then
+                        echo "Downloading MNIST model..."
+                        pip install -q gdown
+                        gdown 1tfnBvcwBsTO8o1yFNCFuqYECe62Q-MvB -O ${BUILD_CTX}/model.pt
+                    else
+                        echo "Model already exists"
+                    fi
+
+                    ls -lh ${BUILD_CTX}
+                """
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    buildImg(IMAGE_GPU)
+                }
+            }
+        }
+
+        stage('Image Metrics') {
+            steps {
+                script {
+                    measureImg(IMAGE_GPU)
+                }
+            }
+        }
+
+        stage('Evaluate') {
+            steps {
+                script {
+                    evaluate(IMAGE_GPU, EVAL_PORT)
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+            sh "ls -R ${METRICS_DIR} || true"
+            archiveArtifacts artifacts: 'eval_metrics/mnist/**/*', allowEmptyArchive: true
+        }
+    }
+}
+
+def buildImg(String image) {
+    def t0 = System.currentTimeMillis()
+    def status = 'SUCCESS'
+
+    try {
+        sh """
+            docker build \\
+              -t ${image} \\
+              -f ${BUILD_CTX}/${DOCKERFILE_GPU} \\
+              ${BUILD_CTX}
+        """
+    } catch (Exception e) {
+        status = 'FAILURE'
+        throw e
+    } finally {
+        def dur = System.currentTimeMillis() - t0
+        def ts = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+        sh """
+            cat > ${METRICS_DIR}/${image}_build.json <<EOF
+{
+  "dimension": "1_cicd_build",
+  "model": "${MODEL_NAME}",
+  "image": "${image}",
+  "status": "${status}",
+  "build_duration_ms": ${dur},
+  "timestamp": "${ts}"
+}
+EOF
+        """
+    }
+}
+
+def measureImg(String image) {
+    sh """
+        SB=\$(docker inspect -f '{{ .Size }}' ${image} 2>/dev/null || echo 0)
+        LC=\$(docker history -q ${image} 2>/dev/null | wc -l)
+        SM=\$(echo "scale=2; \$SB / 1048576" | bc)
+
+        cat > ${METRICS_DIR}/${image}_image.json <<EOF
+{
+  "dimension": "2_image_size",
+  "image": "${image}",
+  "size_bytes": \$SB,
+  "size_mb": \$SM,
+  "layers": \$LC
+}
+EOF
+    """
+}
+
+def evaluate(String image, String port) {
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+
+    sh """
+        T0=\$(date +%s%3N)
+
+        if docker info --format '{{json .Runtimes}}' | grep -q nvidia; then
+            GPU_ARGS="--gpus all"
+        else
+            GPU_ARGS=""
+        fi
+
+        docker run -d \\
+            --name ${CONTAINER_NAME} \\
+            \$GPU_ARGS \\
+            -v ${NFS_LIBS_HOST}:${NFS_LIBS_CONT}:ro \\
+            -e PYTHONPATH=${PY_LIB_PATH} \\
+            -p ${port}:${CONTAINER_PORT} \\
+            -v ${METRICS_DIR}:/app/devops_metrics \\
+            ${image}
+
+        T1=\$(date +%s%3N)
+
+        echo "Waiting for app..."
+
+        READY=0
+        for i in \$(seq 1 300); do
+            if curl -sf http://localhost:${port}/openapi.json > /dev/null 2>&1; then
+                READY=1
+                break
+            fi
+            sleep 0.1
+        done
+
+        T2=\$(date +%s%3N)
+
+        if [ "\$READY" -ne 1 ]; then
+            echo "App failed ❌"
+            docker logs ${CONTAINER_NAME}
+            exit 1
+        fi
+
+        echo "App ready ✅"
+
+        cat > ${METRICS_DIR}/cold_start.json <<EOF
+{
+  "dimension": "3_cold_start",
+  "model": "${MODEL_NAME}",
+  "container_start_ms": \$((T1 - T0)),
+  "app_ready_ms": \$((T2 - T1)),
+  "total_ms": \$((T2 - T0))
+}
+EOF
+    """
+
+    sh """
+        curl -sf -X POST http://localhost:${port}/predict \\
+            -F "file=@${BUILD_CTX}/sample.png" \\
+            | python3 -m json.tool \\
+            > ${METRICS_DIR}/predict_response.json || echo '{}' > ${METRICS_DIR}/predict_response.json
+    """
+
+    sh """
+        docker stats --no-stream ${CONTAINER_NAME} > ${METRICS_DIR}/docker_stats.txt || true
+    """
+
+    sh "docker rm -f ${CONTAINER_NAME} 2>/dev/null || true"
+}

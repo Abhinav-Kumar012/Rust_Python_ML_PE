@@ -25,7 +25,9 @@ print(f"Using device: {device}")
 # Load model
 # ----------------------------
 try:
+    print("Loading model...")
     checkpoint = torch.load("model.pt", map_location=device)
+    print("Checkpoint loaded")
 
     model = Model(**checkpoint["model_args"])
     model.load_state_dict(checkpoint["model_state"])
