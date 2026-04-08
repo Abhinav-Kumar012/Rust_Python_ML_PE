@@ -38,11 +38,11 @@ class LoadTestprofile(HttpUser):
         # )
         
 
-    # def on_start(self):
-    #     self.df = pd.read_parquet(PATH_TO_DSET)
-    #     self.dict_class = {
-    #         0 : "World",
-    #         1 : "Sports",
-    #         2 : "Business",
-    #         3 : "Technology"
-    #     }
+    def on_start(self):
+        self.df = pd.read_parquet(PATH_TO_DSET)
+        # self.dict_class = {
+        #     0 : "World",
+        #     1 : "Sports",
+        #     2 : "Business",
+        #     3 : "Technology"
+        # }
