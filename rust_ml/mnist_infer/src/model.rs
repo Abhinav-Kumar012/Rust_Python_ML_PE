@@ -17,7 +17,7 @@ pub struct Model<B: Backend> {
 	linear2: Linear<B>,
 	activation: Relu,
 }
-
+unsafe impl<B : Backend> std::marker::Sync for Model<B> {}
 impl<B: Backend> Model<B> {
 	/// # Shapes
 	///   - Images [`batch_size`, height, width]

@@ -2,7 +2,7 @@ use burn::backend::Wgpu;
 // use burn::backend::ndarray::{NdArray, NdArrayDevice};
 use burn::module::Module;
 use burn::record::CompactRecorder;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use crate::model::{Model, ModelConfig};
 
@@ -13,7 +13,7 @@ pub struct AppState {
 	// Model might not be Sync or we want to avoid deep cloning.
 	// Wrap in Arc for cheap clone.
 	// Wrap in Mutex to ensure Sync if backend/layers are !Sync.
-	pub model: Arc<Mutex<Model<Backend>>>,
+	pub model: Arc<RwLock<Model<Backend>>>,
 }
 
 impl AppState {
@@ -32,7 +32,7 @@ impl AppState {
 			.expect("Failed to load model weights");
 
 		Self {
-			model: Arc::new(Mutex::new(model)),
+			model: Arc::new(RwLock::new(model)),
 		}
 	}
 }

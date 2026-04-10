@@ -104,7 +104,7 @@ pub async fn predict_handler(
 	let output = {
 		let model = state
 			.model
-			.lock()
+			.read()
 			.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 		model.forward(input)
 	};
