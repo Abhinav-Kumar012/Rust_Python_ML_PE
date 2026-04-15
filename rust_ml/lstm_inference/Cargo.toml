@@ -1,0 +1,18 @@
+[package]
+name = "lstm_inference"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lstm_train = { path = "../lstm_train" }
+burn = { version = "~0.20", features = ["std", "wgpu"], default-features = false }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+[lints]
+workspace = true

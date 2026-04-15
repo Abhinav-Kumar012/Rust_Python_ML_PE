@@ -1,0 +1,44 @@
+# -----------------------
+# Build Stage
+# -----------------------
+FROM ubuntu:16.04 AS builder
+
+WORKDIR /app/rust_ml
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Copy workspace
+# This assumes the build context is the `rust_ml` root directory.
+COPY . .
+
+# Build the release binary for regression_inference
+RUN cargo build --release -p regression_inference
+
+# -----------------------
+# Runtime Stage
+# -----------------------
+FROM nvidia/vulkan:1.3-470
+
+WORKDIR /app
+
+# Copy compiled binary from builder
+COPY --from=builder /app/rust_ml/target/release/regression_inference /app/binary
+
+COPY ./model/regression_train/model.bin /app/model/regression_train/model.bin
+# Environment variables
+ENV RUST_LOG=info
+# Setup the default mounted model path
+ENV MODEL_PATH=/app/model/regression_train/model.bin
+
+EXPOSE 9050
+
+CMD ["./binary"]

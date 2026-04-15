@@ -1,0 +1,326 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{minted}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{pdfpages}
+
+
+\title{\textbf{Comparative Analysis of LSTM Implementation: Rust (Burn) vs. PyTorch}}
+\author{Technical Report}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+This document outlines the detailed architectural, mathematical, and translational specifics of implementing a Long Short-Term Memory (LSTM) model across two prominent machine learning environments: Rust (using the Burn framework) and Python (using PyTorch). It covers the model architecture, training pipelines, specialized deployment techniques using network filesystems (NFS) with Docker, and language-specific design implications.
+
+\section{Model Architecture and Mathematical Formulation}
+
+\subsection{Mathematical Foundation of the LSTM Cell}
+The core of the model revolves around a custom, manually-implemented LSTM cell. Instead of relying on the standard un-inspectable black-box LSTM implementations provided by typical ML libraries, both codebases explicitly define the cell-level math. 
+
+For a given timestep $t$, the input tensor $x_t$ and the previous hidden state $h_{t-1}$ are used to compute the various gates. The mathematical formulation utilized is:
+\begin{align}
+    f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \quad &\text{(Forget Gate)} \\
+    i_t &= \sigma(W_i \cdot [h_{t-1}, x_t] + b_i) \quad &\text{(Input Gate)} \\
+    g_t &= \tanh(W_g \cdot [h_{t-1}, x_t] + b_g) \quad &\text{(Candidate State)} \\
+    o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \quad &\text{(Output Gate)}
+\end{align}
+\begin{align}
+    c_t &= f_t \odot c_{t-1} + i_t \odot g_t \quad &\text{(New Cell State)} \\
+    h_t &= o_t \odot \tanh(c_t) \quad &\text{(New Hidden State)}
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $\sigma$ represents the Sigmoid activation function.
+    \item $\tanh$ represents the Hyperbolic Tangent activation function.
+    \item $\odot$ denotes element-wise multiplication (Hadamard product).
+    \item $[h_{t-1}, x_t]$ symbolizes the concatenation of the previous hidden state and the current input.
+\end{itemize}
+
+\subsection{Architectural Details}
+Both implementations adhere strictly to the following architectural design:
+\begin{enumerate}
+    \item \textbf{Layer Normalization:} Pre-activation gates, the cell state ($c_t$), and the hidden state ($h_t$) pass through separate \texttt{LayerNorm} layers. This design choice stabilizes training dynamics since the feature distributions inside the LSTM evolve at every sequence step (making standard Batch Normalization ineffective).
+    \item \textbf{Optimized Gate Compute:} Instead of computing 4 separate linear transformations per timestep for the features, the model employs a single combined projection that outputs a $4 \times \text{hidden\_size}$ tensor. This tensor is subsequently split into four chunks corresponding to the $i, f, g$, and $o$ gates.
+    \item \textbf{Bidirectional Support:} An encapsulated \texttt{StackedLstm} module stacks multiple manual LSTM layers (applying dropout between layers except on the final one). The main \texttt{LstmNetwork} integrates a forward processing stack and an optional backward processing stack (which flips the temporal dimension of the input sequence). Their respective output hidden states are concatenated along the feature dimension before passing through a fully-connected projection head.
+    \item \textbf{Initialization bias:} The forget-gate bias parameters are explicitly initialized to $1.0$ (via Xavier Normal parameter slicing) to prevent fatal early-training gradient decay.
+\end{enumerate}
+
+
+\section{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{RustLocust/LSTM.pdf}
+
+
+
+\section{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{PythonLocust/LSTM.pdf}
+
+\section{Training Pipeline}
+The training behavior is intentionally synchronized to ensure parity between the languages:
+\begin{itemize}
+    \item \textbf{Data Loading:} Operates synchronously on synthetically generated noisy sequential datasets. The validation set is scaled symmetrically relative to the training set ($20\%$ of training size).
+    \item \textbf{Optimization Algorithm:} Utilizes the Adam Optimizer.
+    \item \textbf{Loss Function:} Mean Squared Error (MSE), with reduction set to \textit{mean}. Both explicitly weigh loss accumulation during epoch passes by scaling local batch losses by the discrete batch size, averaging properly at the conclusion of the epoch.
+    \item \textbf{Gradient Clipping:} Ensures numerical stability on longer sequence inputs. The gradient norm is strictly clipped to $\max = 1.0$ right before the optimizer steps.
+    \item \textbf{Artifacts Output:} Training scripts generate an \texttt{artifact\_dir} where they store a \texttt{config.json} representation of hyperparameters, and the full state dictionary (\texttt{model.pt} in PyTorch; CompactRecorder files in Rust Burn).
+\end{itemize}
+
+\section{Inference Pipeline and Docker NFS Integration}
+\subsection{PyTorch Inference Architecture}
+A critical requirement for modern PyTorch inference deployments is resolving the massive disk footprint of CUDA-enabled PyTorch backend libraries. The PyTorch pipeline employs a sophisticated Network File System (NFS) logic to achieve a highly optimized, lightweight Dockerized inference deployment:
+\begin{enumerate}
+    \item \textbf{External Library Mounting:} A host-level script (\texttt{mount\_libs.sh}) maps an external NAS/NFS storage partition (from \texttt{172.16.203.14}) loaded with Python environments targeting \texttt{/mnt/LSTM-libs}.
+    \item \textbf{Optimized Dockerfile:} The image leverages the \texttt{nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04} base image and installs basic \texttt{python3.11} runtime headers without calling \texttt{pip install torch}. Thus, the final image size is structurally negligible compared to standard ml-images.
+    \item \textbf{Runtime Binding:} The inference container bootloader scripts (\texttt{run\_container.sh}) bind these volume mounts (\texttt{-v \$NFS\_MOUNT\_POINT:/external-libs}) and crucially overrides the \texttt{PYTHONPATH} env-variable:
+    \begin{verbatim}
+    -e PYTHONPATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/.../site-packages"
+    \end{verbatim}
+    \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively. 
+\end{enumerate}
+
+\subsection{Rust Inference Architecture}
+Rust's inference pipeline diverges significantly regarding deployment complexity due to compilation structures:
+\begin{itemize}
+    \item \textbf{Stateless Binaries:} No containerized runtime libraries are mandated because Burn compiles statically down to heavily optimized binaries, pulling model states directly via the \texttt{CompactRecorder}.
+    \item \textbf{Visualization:} Results are mapped into native Polars \texttt{DataFrame} objects (\texttt{df![]}) rendering lightweight native tables detailing \textit{expected targets} versus \textit{computed predictions}.
+\end{itemize}
+
+\section{Implementation Specifics}
+\subsection{PyTorch Specific Constraints}
+\begin{itemize}
+    \item \textbf{Dynamic computation graphing:} The \texttt{model.py} cleanly slices and chunks gates natively on tensors (e.g., \texttt{gates.chunk(4, dim=1)}).
+    \item \textbf{Sequence Reversals:} Done programmatically via continuous \texttt{Tensor.flip(dims=[1])} which mandates that tensors must remain contiguously stored within PyTorch internals to avoid memory reallocation overhead.
+    \item \textbf{Seed Setting API:} Requires deterministic locking across four sub-systems (\texttt{random, numpy, torch, torch.cuda}) to match Rust's reproducibility parameters.
+\end{itemize}
+
+\subsection{Rust (Burn) Specific Constraints}
+\begin{itemize}
+    \item \textbf{Compile-Time Dimension Types:} Rust explicitly binds Tensor dimensionality at compile time (\texttt{Tensor<B, 3>} vs \texttt{Tensor<B, 2>}). This offers un-matched safety by forbidding invalid dimension injections that PyTorch would crash on dynamically.
+    \item \textbf{Trait Encapsulation:} Leverages explicit trait architectures (\texttt{\#[derive(Module, Config)]}) that automate saving hyperparameters and generating gradient backends. Burn models must be mapped cleanly from standard states to \texttt{autodiff} states.
+    \item \textbf{No-Mutation Logic:} State mutations generated sequentially in LSTMs are represented safely utilizing explicit tuple destructuring via \texttt{LstmState\{hidden, cell\}}, bypassing complex internal pointer tracking.
+    \item \textbf{Explicit Initialization Handling:} Since Burn limits orthogonal initializes out-of-the-box, Xavier Normalization was invoked explicitly, paired with \texttt{slice\_assign} tensor mappings to safely load the 1.0 uniform fill into the forget-gate components. 
+\end{itemize}
+
+\section{Rust: Training Loss Progression and Model Convergence}
+
+The model was trained for a total of 30 epochs. During training, both the training loss and validation loss decreased substantially, indicating that the model was able to learn meaningful patterns from the data.
+
+\subsection{Training Progress}
+
+The training process began with relatively high loss values. However, as training progressed, both the average training loss and average validation loss consistently decreased.
+
+The recorded loss values at different stages of training are shown below:
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Loss Progression}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Epoch} & \textbf{Average Training Loss} & \textbf{Average Validation Loss} \\
+\hline
+5  & 4456.9658 & 4473.4448 \\
+10 & 2510.1016 & 2438.3970 \\
+15 & 900.7457  & 801.6573 \\
+20 & 154.4127  & 164.8311 \\
+25 & 48.2149   & 20.1441 \\
+30 & 52.1122   & 17.5850 \\
+\hline
+\end{tabular}
+\label{tab:loss_progression}
+\end{table}
+
+\subsection{Loss Trend Analysis}
+
+The training loss decreased from 4456.9658 at epoch 5 to 52.1122 at epoch 30. Similarly, the validation loss decreased from 4473.4448 to 17.5850 over the same period.
+
+This large reduction in both training and validation loss suggests that the model successfully converged during training.
+
+Although the training loss slightly increased between epoch 25 and epoch 30, the validation loss continued to decrease. This indicates that the model continued to improve its ability to generalize to unseen data.
+
+The lowest validation loss achieved during the experiment was:
+
+\[
+17.5850
+\]
+
+at epoch 30.
+
+\subsection{Generalization Performance}
+
+The close alignment between the training loss and validation loss throughout training suggests that the model did not suffer from severe overfitting.
+
+In the earlier epochs, both losses were very high, which is expected because the model parameters were still being optimized. As training continued, the losses dropped rapidly, especially between epochs 10 and 25.
+
+This behavior indicates that the model learned most of its predictive capability during the middle phase of training.
+
+\subsection{Execution Time}
+
+The complete training process required:
+
+\begin{itemize}
+    \item Real time: 6 minutes and 42.185 seconds
+    \item User CPU time: 6 minutes and 42.414 seconds
+    \item System CPU time: 3.49 seconds
+\end{itemize}
+
+The relatively low system CPU time compared to user CPU time suggests that most of the runtime was spent performing model computation rather than operating system overhead.
+\section{Python: LSTM Model Architecture and Training Performance}
+
+The Long Short-Term Memory (LSTM) model consists of a 2-layer bidirectional LSTM followed by a fully connected output layer. Dropout is applied between LSTM layers to improve generalization.
+
+\textbf{Model Architecture:}
+
+
+The model was trained for 30 epochs. Training and validation performance improved significantly and consistently.
+
+Training loss decreased from 5543.18 to 56.11 (98.99\% reduction), while validation loss decreased from 5699.26 to 48.92. 
+The model achieved strong regression performance, with validation RMSE reaching 6.99 and MAE reaching 4.33.
+
+The $R^2$ score improved from negative values to 0.9517, indicating strong predictive capability.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Loss & 56.11 & 30 & 5543.18 & 1 \\
+Train & RMSE & 7.49 & 30 & 74.45 & 1 \\
+Train & MAE & 5.03 & 30 & 67.25 & 1 \\
+Train & R$^2$ & -4.41 & 1 & 0.9452 & 30 \\
+Train & Grad Norm (Total) & 524.61 & 1 & 4972.41 & 24 \\
+Train & Iteration Speed (it/s) & 5.02 & 29 & 6.94 & 4 \\
+Train & CPU Memory (GB) & 0.87 & -- & 1.13 & -- \\
+Train & CPU Usage (\%) & 72.4 & -- & 88.8 & -- \\
+\hline
+
+Valid & Loss & 47.96 & 29 & 5699.26 & 1 \\
+Valid & RMSE & 6.93 & 29 & 75.49 & 1 \\
+Valid & MAE & 3.54 & 28 & 68.51 & 1 \\
+Valid & R$^2$ & -4.63 & 1 & 0.9526 & 29 \\
+Valid & Iteration Speed (it/s) & 5.02 & 29 & 6.94 & 4 \\
+Valid & CPU Memory (GB) & 0.87 & -- & 1.13 & -- \\
+Valid & CPU Usage (\%) & 72.4 & -- & 88.8 & -- \\
+\hline
+
+\end{tabular}
+\caption{Extended LSTM Training and Validation Metrics Summary}
+\end{table}
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 158.63 seconds
+    \item Average Epoch Time: 5.18 seconds
+    \item Iteration Speed (Mean): 6.22 it/s
+    \item Gradient Norm (Mean): 1394.59
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size &  3.98GB &  974MB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
+
+\end{document}

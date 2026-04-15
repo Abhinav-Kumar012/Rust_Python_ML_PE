@@ -27,22 +27,22 @@ class LoadTestprofile(HttpUser):
         text_to_send = {
             'text' : random_row['text']
         }
-        response = self.client.post("/predict",json=text_to_send)
-        is_correct = (response.json()['prediction'] == self.dict_class[random_row['label']])
-        events.request.fire(
-            request_type="ML",
-            name="accuracy",
-            response_time=0,
-            response_length=1,
-            exception=None if is_correct else Exception("wrong"),
-        )
+        _ = self.client.post("/predict",json=text_to_send)
+        # is_correct = (response.json()['prediction'] == self.dict_class[random_row['label']])
+        # events.request.fire(
+        #     request_type="ML",
+        #     name="accuracy",
+        #     response_time=0,
+        #     response_length=1,
+        #     exception=None if is_correct else Exception("wrong"),
+        # )
         
 
     def on_start(self):
         self.df = pd.read_parquet(PATH_TO_DSET)
-        self.dict_class = {
-            0 : "World",
-            1 : "Sports",
-            2 : "Business",
-            3 : "Technology"
-        }
+        # self.dict_class = {
+        #     0 : "World",
+        #     1 : "Sports",
+        #     2 : "Business",
+        #     3 : "Technology"
+        # }

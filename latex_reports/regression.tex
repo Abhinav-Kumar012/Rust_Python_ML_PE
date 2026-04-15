@@ -1,0 +1,333 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{pdfpages}
+
+
+\title{\textbf{Comparative Analysis of Regression Implementations: Rust (Burn) vs. PyTorch}}
+\author{Technical Report}
+\date{\today}
+
+\begin{document} 
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+This document outlines the architectural, mathematical, and deployment specifics of implementing a Neural Network-based Regression model across two disparate machine learning environments: Rust (utilizing the Burn framework) and Python (utilizing PyTorch). It covers the distinct model architecture decisions, dataset handling strategies, and specialized pipeline deployment techniques leveraging Network File Systems (NFS) mapping via Docker bounds.
+
+\section{Model Architecture and Mathematical Formulation}
+
+\subsection{Mathematical Foundation}
+The core mathematical foundation deployed across both frameworks is a classical Feed-Forward Neural Network consisting of a single hidden dimension mapping inputs directly onto a continuous single-variable regression output.
+
+For a given input feature vector $X \in \mathbb{R}^N$ (where $N$ dictates the feature size depending on the target dataset), the network's forward transformation can be represented sequentially as:
+\begin{align}
+    Z_1 &= X \cdot W_1^T + b_1 \quad &\text{(Input Projection)} \\
+    A_1 &= \max(0, Z_1)        \quad &\text{(ReLU Activation)} \\
+    \hat{Y} &= A_1 \cdot W_2^T + b_2 \quad &\text{(Output Projection)}
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $W_1 \in \mathbb{R}^{H \times N}$ and $b_1 \in \mathbb{R}^H$ map the inputs onto the hidden vector space $H$.
+    \item $\max(0, \cdot)$ denotes the Non-Linear Rectified Linear Unit (ReLU) mapping algorithm.
+    \item $W_2 \in \mathbb{R}^{1 \times H}$ and $b_2 \in \mathbb{R}$ collapse the hidden abstraction onto the finalized regression scalar prediction $\hat{Y}$.
+\end{itemize}
+
+\subsection{Architectural Configurations}
+While the mathematical foundations are identical, implementations slightly differ based on dataset selections within the modules:
+\begin{itemize}
+    \item \textbf{PyTorch Architecture:} Configures $N=13$ input features mapping to $H=64$ hidden parameters.
+    \item \textbf{Rust (Burn) Architecture:} Configures $N=8$ input features concurrently mapping to $H=64$ hidden parameters.
+\end{itemize}
+In both configurations, standard parameter biases (`bias=True`) are included and automatically initialized.
+
+\section{Training Pipelines}
+
+Both codebases train the model iteratively tracking gradients via the Adam optimizer scaled against Mean Squared Error (MSE) loss logic:
+\[ \text{MSE} = \frac{1}{B} \sum_{i=1}^{B} (Y_i - \hat{Y}_i)^2 \]
+
+\subsection{PyTorch Context}
+\begin{itemize}
+    \item \textbf{Data Loading:} Automatically pulls the \textbf{Boston Housing} dataset array (.npz file) from an external Google API via `urllib` and manually partitions it down into an explicit $80/20$ split.
+    \item \textbf{Telemetry Metrics:} Generates explicit hardware tracking loops inside the main epoch runner. Uses the `psutil` library to compute and stream epoch `iteration\_speed`, raw RAM consumption, and `cpu\_temp` hardware sensors parallel to the loss parameters.
+\end{itemize}
+
+\subsection{Rust (Burn) Context}
+\begin{itemize}
+    \item \textbf{Data Loading:} Links into Huggingface's dataset registry asynchronously targeting the \textbf{California Housing} SQLized splits mapping onto memory arrays via localized `HousingDistrictItem` structs.
+    \item \textbf{Normalization Mapping:} Computes spatial min-max normalizations programmatically over inputs during training:
+    \[ X_{norm} = \frac{X - \text{min}}{\text{max} - \text{min}} \]
+    This logic restricts features within standard boundaries precluding exploding gradient derivations.
+\end{itemize}
+
+\section{Inference Pipeline and Docker NFS Integration}
+
+Deploying these isolated pipelines necessitates radically different execution strategies, highlighting Python's heavyweight runtime dependency bottlenecks versus Rust's compile-time optimizations.
+
+\subsection{PyTorch Inference Architecture}
+Standard PyTorch Docker environments routinely eclipse several gigabytes due to CUDA bindings and generic scientific computation loops. To circumvent this inside microservices, the PyTorch inference pipeline mandates a hybrid Network File System (NFS) mapping architecture:
+\begin{enumerate}
+    \item \textbf{NFS Mounting (\texttt{mount\_libs.sh}):} Installs an external `nfs-common` client locally and binds the extensive python library volume from an external dedicated storage server (`172.16.203.14`) into the host machine's `/mnt/LSTM-libs` map.
+    \item \textbf{Lightweight Container Image:} The backend \texttt{Dockerfile} avoids `pip install` commands completely, simply initializing a barebone `nvidia/cuda:12.1.1` image mapping Python $3.11$ system links. 
+    \item \textbf{Volume Inject (\texttt{run\_container.sh}):} The script initializes the container enforcing `-v` flags that sync the NFS `/mnt/LSTM-libs` directory seamlessly onto the Docker's `/external-libs`. Crucially, it overrides the system \texttt{PYTHONPATH} to target those external `site-packages` at runtime.
+    \item \textbf{Execution:} The `FastAPI` instance loads, bypasses massive disk pulls, links the models iteratively, and fields inbound `HousingFeatures` lists continuously.
+\end{enumerate}
+
+\subsection{Rust (Burn) Inference Architecture}
+Rust handles Docker microservices inherently via statically linked deployments:
+\begin{itemize}
+    \item \textbf{Multi-Stage Compiling:} Executes a build phase operating within an oversized `rust:1.92-alpine` chain, ejecting the resulting binary onto an isolated stripped `alpine:3.23` environment structure.
+    \item \textbf{Native Routing:} Utilizes \texttt{Axum} servers to establish the HTTP logic endpoints securely routing JSON payloads mapping to specific feature names (e.g. \texttt{median\_income}, \texttt{house\_age}).
+\end{itemize}
+
+\section{Rust: Regression Model Performance Analysis}
+
+The regression model used in this experiment was a simple feed-forward neural network consisting of one hidden layer followed by an output layer. The model was designed to predict the median house value based on eight input features.
+
+\subsection{Model Architecture}
+
+The architecture of the regression model is shown below:
+
+\begin{verbatim}
+RegressionModel {
+  input_layer: Linear {d_input: 8, d_output: 64, bias: true, params: 576}
+  output_layer: Linear {d_input: 64, d_output: 1, bias: true, params: 65}
+  activation: Relu
+  params: 641
+}
+\end{verbatim}
+
+The model contains:
+
+\begin{itemize}
+    \item An input layer that maps 8 input features to 64 hidden units
+    \item A ReLU activation function applied after the hidden layer
+    \item An output layer that maps the 64 hidden units to a single scalar value
+\end{itemize}
+
+The total number of trainable parameters in the model was only 641, making it a lightweight model suitable for fast training and inference.
+
+\subsection{Training Configuration}
+
+The model was trained for 100 epochs. A constant learning rate of:
+
+\[
+1.0 \times 10^{-3}
+\]
+
+was used throughout the entire training process.
+
+\subsection{Training Performance}
+
+The training loss decreased substantially over the 100 epochs. Initially, the model started with a training loss of 3.086 during the first epoch. By the final epoch, the loss had reduced to 0.414.
+
+This significant reduction in loss indicates that the model successfully learned the underlying relationship between the input features and the target variable.
+
+\subsection{Validation Performance}
+
+Validation loss also showed a considerable improvement during training. The validation loss decreased from 4.132 in the first epoch to a minimum of 0.635 at epoch 51.
+
+The difference between the final training loss and the minimum validation loss suggests that the model achieved good generalization performance without severe overfitting.
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Metrics Summary for the Regression Model}
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min.} & \textbf{Epoch} & \textbf{Max.} & \textbf{Epoch} \\
+\hline
+Train & Loss & 0.414 & 100 & 3.086 & 1 \\
+Train & Learning Rate & $1.0 \times 10^{-3}$ & 1 & $1.0 \times 10^{-3}$ & 100 \\
+Train & CPU Memory (GB) & 2.125 & 4 & 2.325 & 56 \\
+Train & CPU Usage (\%) & 19.539 & 54 & 37.989 & 11 \\
+\hline
+Valid & Loss & 0.635 & 51 & 4.132 & 1 \\
+Valid & CPU Memory (GB) & 2.124 & 3 & 2.325 & 55 \\
+Valid & CPU Usage (\%) & 19.550 & 54 & 37.960 & 11 \\
+\hline
+\end{tabular}
+\label{tab:regression_metrics_summary}
+\end{table}
+
+\subsection{Prediction Example}
+
+A sample prediction generated by the model is shown below:
+
+\begin{verbatim}
+Predicted 2.021734 Expected 2.158
+\end{verbatim}
+
+The predicted value is reasonably close to the expected value, indicating that the model was able to approximate the target variable with acceptable accuracy.
+
+Since the median house value was measured in units of 100,000 dollars, the prediction corresponds to:
+
+\begin{itemize}
+    \item Predicted value: approximately 202,173 dollars
+    \item Expected value: approximately 215,800 dollars
+\end{itemize}
+
+\subsection{Predicted vs. Expected Distribution}
+
+The predicted-versus-expected plot suggests that the model captures the general trend in the target values, although some prediction errors remain for certain samples.
+
+Most of the predicted values appear concentrated around the central region of the distribution, indicating that the model performs better on common house value ranges than on extreme values.
+
+\subsection{Resource Utilization}
+
+The model required relatively little memory during execution. Training memory usage ranged from 2.125 GB to 2.325 GB, while validation memory usage ranged from 2.124 GB to 2.325 GB.
+
+CPU utilization remained moderate throughout training. Training CPU usage ranged from 19.539\% to 37.989\%, while validation CPU usage ranged from 19.550\% to 37.960\%.
+
+CPU temperature values were unavailable and therefore recorded as NaN.
+
+\subsection{Execution Time and Failure}
+
+The complete training and evaluation process required:
+
+\begin{itemize}
+    \item Real time: 3 minutes and 18.257 seconds
+    \item User CPU time: 4 minutes and 13.554 seconds
+    \item System CPU time: 50.340 seconds
+\end{itemize}
+
+\section{Language Specific Implementation Details}
+
+\subsection{PyTorch-Specific Paradigms}
+\begin{itemize}
+    \item \textbf{Thread Clamping:} Due to inference optimization restrictions (especially running CPU variations alongside container structures), the `app.py` enforces explicit core binding calls via `torch.set\_num\_threads(1)` and `torch.set\_num\_interop\_threads(1)` securing computational resources and restricting OS context-switching overheads.
+    \item \textbf{Matrix Array Verifications:} Manually inspects raw matrix vector mappings validating dimensions dynamically against numeric constraints: \texttt{len(x) != NUM\_FEATURES} triggering runtime panics before pipeline evaluations fail. 
+    \item \textbf{Manual Hardware Moving:} The framework is heavily littered with required `.to(device)` mapping configurations switching inputs, datasets, targets, and models manually between the host and external components.
+\end{itemize}
+
+\subsection{Rust (Burn)-Specific Paradigms}
+\begin{itemize}
+    \item \textbf{Generic Compile-Time Shapes:} Dimension mappings and tensor validations are fundamentally enforced inside the Rust compiler boundaries via `<B, 2>` arrays indicating batches of distinct input structures mapping to `targets: Tensor<B, 1>`. Invalid sizes fail compilation, voiding the requirement for manual PyTorch matrix validations.
+    \item \textbf{Struct Batching Protocols:} Inference doesn't evaluate primitive float arrays. Intead, the API relies on executing an overarching `HousingBatcher` which transforms specific struct domains (\texttt{HousingDistrictItem}) safely into tensor primitives while executing implicit `self.normalizer.to\_device(device)` logic silently against constants behind boundaries.
+    \item \textbf{Record Deserialization:} States are strictly detached from models via standard `.mpk` maps. They invoke explicit \texttt{NoStdTrainingRecorder::new().load()} tracking traits unbinding memory limits inherent to standard dict serialization configurations natively loaded via `RegressionModelConfig`.
+\end{itemize}
+
+\newpage
+\section{Python: Regression Model Architecture and Training Performance}
+
+The regression model used in this experiment is a lightweight fully connected neural network with a small number of parameters (961 total). The model is optimized using mean squared error loss.
+
+
+
+The model was trained for 100 epochs. Training loss decreased significantly from 8265.55 to 69.86 (99.15\% reduction), while validation loss decreased from 9045.34 to 55.70.
+
+Despite strong loss reduction, the model struggled to achieve good generalization. The validation $R^2$ score remained negative (-1.07), indicating that the model performs worse than a simple baseline predictor.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Loss & 68.50 & 100 & 8265.55 & 1 \\
+Train & RMSE & 8.39 & 100 & 91.53 & 1 \\
+Train & MAE & 6.29 & 100 & 90.33 & 1 \\
+Train & R$^2$ & -96.93 & 1 & 0.1767 & 100 \\
+Train & Grad Norm (Total) & 118.80 & -- & 112876.03 & 1 \\
+Train & Iteration Speed (it/s) & 0.69 & 1 & 14.39 & 54 \\
+Train & CPU Memory (GB) & 0.87 & -- & 1.02 & -- \\
+Train & CPU Usage (\%) & 45.7 & -- & 97.6 & -- \\
+\hline
+
+Valid & Loss & 50.93 & 65 & 9045.34 & 1 \\
+Valid & RMSE & 7.14 & 65 & 95.11 & 1 \\
+Valid & MAE & 6.00 & 65 & 93.52 & 1 \\
+Valid & R$^2$ & -335.40 & 1 & -0.8940 & 65 \\
+Valid & Iteration Speed (it/s) & 0.69 & 1 & 14.39 & 54 \\
+Valid & CPU Memory (GB) & 0.87 & -- & 1.02 & -- \\
+Valid & CPU Usage (\%) & 45.7 & -- & 97.6 & -- \\
+\hline
+
+\end{tabular}
+\caption{Regression Model Training and Validation Metrics Summary}
+\end{table}
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 47.39 seconds
+    \item Average Epoch Time: 0.225 seconds
+    \item Iteration Speed (Mean): 10.36 it/s
+    \item Gradient Norm (Mean): 7981.31
+    \item NaN Events: 0
+    \item Convergence: Non-monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+The results indicate that while optimization was successful in reducing loss, the model lacks sufficient capacity or feature representation to generalize well. The persistently negative validation $R^2$ suggests underfitting or a mismatch between model complexity and data characteristics.
+
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size &  3.98GB &  973MB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
+
+
+
+\end{document}

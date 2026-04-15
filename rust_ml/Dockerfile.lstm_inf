@@ -1,0 +1,44 @@
+# -----------------------
+# Build Stage
+# -----------------------
+FROM ubuntu:16.04 AS builder
+
+WORKDIR /app/rust_ml
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+COPY . .
+
+# Build the release binary for lstm_inference
+RUN cargo build --release -p lstm_inference
+
+# -----------------------
+# Runtime Stage
+# -----------------------
+FROM nvidia/vulkan:1.3-470
+
+WORKDIR /app
+
+# Copy compiled binary from builder
+COPY --from=builder /app/rust_ml/target/release/lstm_inference /app/binary
+
+COPY ./model/lstm_train/config.json /app/model/lstm_train/config.json
+COPY ./model/lstm_train/model.mpk /app/model/lstm_train/model.mpk
+
+# Environment variables
+ENV RUST_LOG=info
+# Setup the default mounted model path
+ENV MODEL_DIR=/app/model/lstm_train
+
+EXPOSE 9050
+
+CMD ["./binary"]

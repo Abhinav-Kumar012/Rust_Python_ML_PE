@@ -1,0 +1,685 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem} 
+\usepackage{array}
+\usepackage{float} 
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{pdfpages}
+
+
+\lstdefinelanguage{Dockerfile}{
+  keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
+  sensitive=true,
+  comment=[l]{\#},
+  morestring=[b]",
+}
+
+\title{\textbf{MNIST}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Architecture Details}
+
+\begin{table}[h!]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|l|l|l|l|}
+\hline
+\textbf{Step} & \textbf{Layer} & \textbf{Configuration} & \textbf{Input Shape} & \textbf{Output Shape} \\
+\hline
+
+1 & Input & Grayscale Images & 
+$[B, H, W]$ &
+$[B, H, W]$ \\
+
+\hline
+2 & Reshape & Add channel dimension &
+$[B, H, W]$ &
+$[B, 1, H, W]$ \\
+
+\hline
+3 & Conv2D (conv1) &
+$1 \rightarrow 8$, kernel $3 \times 3$ &
+$[B, 1, H, W]$ &
+$[B, 8, H-2, W-2]$ \\
+
+\hline
+4 & Dropout &
+$p = 0.5$ &
+$[B, 8, H-2, W-2]$ &
+$[B, 8, H-2, W-2]$ \\
+
+\hline
+5 & Conv2D (conv2) &
+$8 \rightarrow 16$, kernel $3 \times 3$ &
+$[B, 8, H-2, W-2]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+6 & Dropout &
+$p = 0.5$ &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+7 & ReLU &
+Activation &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, H-4, W-4]$ \\
+
+\hline
+8 & Adaptive Avg Pool &
+Output size $8 \times 8$ &
+$[B, 16, H-4, W-4]$ &
+$[B, 16, 8, 8]$ \\
+
+\hline
+9 & Flatten &
+$16 \times 8 \times 8$ &
+$[B, 16, 8, 8]$ &
+$[B, 1024]$ \\
+
+\hline
+10 & Linear (fc1) &
+$1024 \rightarrow \texttt{hidden\_size}$ &
+$[B, 1024]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+11 & Dropout &
+$p = 0.5$ &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+12 & ReLU &
+Activation &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{hidden\_size}]$ \\
+
+\hline
+13 & Linear (fc2) &
+$\texttt{hidden\_size} \rightarrow \texttt{num\_classes}$ &
+$[B, \texttt{hidden\_size}]$ &
+$[B, \texttt{num\_classes}]$ \\
+
+\hline
+\end{tabular}
+\caption{Detailed architecture of the convolutional neural network implemented in Burn. 
+$B$ denotes batch size, $H$ and $W$ denote input image height and width respectively.}
+\label{tab:burn-cnn-architecture}
+\end{table}
+
+\noindent\textbf{Notes:}
+\begin{itemize}
+  \item All convolution layers use default stride = 1 and no padding.
+  \item Dropout probability is configurable via \texttt{ModelConfig.dropout}.
+  \item Adaptive average pooling ensures a fixed spatial resolution regardless of input size.
+  \item The model is fully differentiable and backend-agnostic via Burn's \texttt{Backend} trait.
+\end{itemize}
+
+
+\section{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{RustLocust/MNIST.pdf}
+
+
+\section{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{PythonLocust/MNIST.pdf}
+
+
+\section{Rust: Dockerfile Design and Containerization Strategy}
+
+The Dockerfile used for the Rust-based MNIST inference application follows a multi-stage build strategy. Multi-stage builds are commonly used to reduce the size of the final container image by separating the compilation environment from the runtime environment.
+
+\subsection{Overview of Multi-Stage Build}
+
+The Dockerfile is divided into two major stages:
+
+\begin{enumerate}
+    \item Builder Stage
+    \item Runtime Stage
+\end{enumerate}
+
+The builder stage is responsible for compiling the Rust application, while the runtime stage contains only the compiled binary and the required runtime dependencies.
+
+\subsection{Builder Stage}
+
+The first stage begins with:
+
+\begin{verbatim}
+FROM ubuntu:16.04 AS builder
+\end{verbatim}
+
+This instruction uses Ubuntu 16.04 as the base image for building the Rust application. The alias \texttt{builder} is assigned to this stage so that its outputs can later be referenced in the runtime stage.
+
+\subsubsection{Working Directory}
+
+\begin{verbatim}
+WORKDIR /app/rust_ml
+\end{verbatim}
+
+The \texttt{WORKDIR} instruction sets the default working directory inside the container to:
+
+\begin{verbatim}
+/app/rust_ml
+\end{verbatim}
+
+All subsequent commands in the builder stage are executed relative to this directory.
+
+\subsubsection{Installing Build Dependencies}
+
+The following command installs the required packages for compiling the Rust project:
+
+\begin{verbatim}
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+\end{verbatim}
+
+Each package serves a specific purpose:
+
+\begin{itemize}
+    \item \texttt{curl}: Used to download external files, including the Rust installation script.
+    \item \texttt{build-essential}: Provides common compilation tools such as \texttt{gcc}, \texttt{g++}, and \texttt{make}.
+    \item \texttt{pkg-config}: Helps discover system libraries during the build process.
+    \item \texttt{ca-certificates}: Ensures secure HTTPS communication when downloading dependencies.
+\end{itemize}
+
+The final cleanup command:
+
+\begin{verbatim}
+rm -rf /var/lib/apt/lists/*
+\end{verbatim}
+
+removes cached package lists to reduce image size.
+
+\subsubsection{Installing Rust}
+
+Rust is installed using the official Rust installer:
+
+\begin{verbatim}
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+\end{verbatim}
+
+This command downloads and executes the \texttt{rustup} installer.
+
+The flags used have the following meanings:
+
+\begin{itemize}
+    \item \texttt{--proto '=https'}: Restricts downloads to HTTPS only.
+    \item \texttt{--tlsv1.2}: Forces the use of TLS version 1.2 for secure transport.
+    \item \texttt{-sSf}: Makes \texttt{curl} silent while still showing errors if the download fails.
+    \item \texttt{-y}: Automatically accepts all installation prompts.
+\end{itemize}
+
+After Rust is installed, the PATH environment variable is updated:
+
+\begin{verbatim}
+ENV PATH="/root/.cargo/bin:${PATH}"
+\end{verbatim}
+
+This ensures that Rust tools such as \texttt{cargo} and \texttt{rustc} are available in subsequent commands.
+
+\subsubsection{Copying Source Code}
+
+\begin{verbatim}
+COPY . .
+\end{verbatim}
+
+This instruction copies the entire project directory from the host system into the current working directory inside the container.
+
+\subsubsection{Building the Application}
+
+\begin{verbatim}
+RUN cargo build --release -p mnist_infer
+\end{verbatim}
+
+This command compiles the Rust project in release mode.
+
+The options used are:
+
+\begin{itemize}
+    \item \texttt{--release}: Builds the application with compiler optimizations enabled.
+    \item \texttt{-p mnist\_infer}: Specifies that only the \texttt{mnist\_infer} package should be compiled.
+\end{itemize}
+
+The generated executable is stored in:
+
+\begin{verbatim}
+/app/rust_ml/target/release/mnist_infer
+\end{verbatim}
+
+\subsection{Runtime Stage}
+
+The second stage begins with:
+
+\begin{verbatim}
+FROM nvidia/vulkan:1.3-470
+\end{verbatim}
+
+This stage uses an NVIDIA Vulkan runtime image as the base image. The purpose of using this image is to provide Vulkan-related runtime libraries and GPU compatibility for applications that may rely on Vulkan acceleration.
+
+Compared to the builder image, this runtime image is significantly smaller because it does not contain compilation tools, Rust compilers, or source code.
+
+
+\subsubsection{Runtime Working Directory}
+
+\begin{verbatim}
+WORKDIR /app
+\end{verbatim}
+
+This sets the runtime working directory to:
+
+\begin{verbatim}
+/app
+\end{verbatim}
+
+All runtime files are placed relative to this location.
+
+\subsubsection{Copying the Compiled Binary}
+
+\begin{verbatim}
+COPY --from=builder /app/rust_ml/target/release/mnist_infer /app/binary
+\end{verbatim}
+
+This instruction copies the compiled executable from the builder stage into the runtime image.
+
+The \texttt{--from=builder} option tells Docker to retrieve the file from the stage named \texttt{builder}.
+
+The binary is renamed from:
+
+\begin{verbatim}
+mnist_infer
+\end{verbatim}
+
+to:
+
+\begin{verbatim}
+/app/binary
+\end{verbatim}
+
+inside the runtime container.
+
+\subsubsection{Copying the Model File}
+
+\begin{verbatim}
+COPY ./model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
+\end{verbatim}
+
+This instruction copies the trained model file into the runtime container.
+
+The model file is stored at:
+
+\begin{verbatim}
+/app/model/mnist_rust/model.mpk
+\end{verbatim}
+
+The application can later load this file during inference.
+
+\subsubsection{Environment Variables}
+
+Two environment variables are defined:
+
+\begin{verbatim}
+ENV RUST_LOG=info
+ENV MODEL_PATH=/app/model/mnist_rust/model.mpk
+\end{verbatim}
+
+Their purposes are:
+
+\begin{itemize}
+    \item \texttt{RUST\_LOG=info}: Enables logging at the info level.
+    \item \texttt{MODEL\_PATH}: Stores the path to the trained model file.
+\end{itemize}
+
+Using environment variables makes the application more flexible because configuration values can be changed without modifying the source code.
+
+\subsubsection{Exposing the Application Port}
+
+\begin{verbatim}
+EXPOSE 9050
+\end{verbatim}
+
+This instruction documents that the containerized application listens on port 9050.
+
+Although \texttt{EXPOSE} does not automatically publish the port to the host system, it informs users and orchestration tools such as Docker Compose or Kubernetes which port should be mapped.
+
+\subsubsection{Container Startup Command}
+
+\begin{verbatim}
+CMD ["./binary"]
+\end{verbatim}
+
+This instruction defines the default command executed when the container starts.
+
+The compiled Rust binary is launched directly from the runtime working directory.
+
+\subsection{Advantages of the Dockerfile Design}
+
+This Dockerfile provides several important advantages:
+
+\begin{itemize}
+    \item Reduced final image size through multi-stage builds.
+    \item Separation of build dependencies and runtime dependencies.
+    \item Improved security because the runtime image does not contain compilers or source code.
+    \item Faster deployment due to a lightweight runtime container.
+    \item Better portability because the same container can run consistently across different environments.
+    \item Easier maintenance through the use of environment variables and explicit working directories.
+\end{itemize}
+
+Overall, this Dockerfile is designed to efficiently package the Rust-based MNIST inference application for deployment while minimizing runtime overhead and maintaining reproducibility.
+
+\section{Python (PyTorch) Dockerfile}
+
+This section details the image optimization strategy implemented for the MNIST inference container. The core approach minimizes the Docker image size by decoupling the heavy machine learning dependencies (PyTorch, etc.) from the application container. Instead of baking these libraries into the image, they are stored on an external volume (NFS share) and mounted at runtime.
+
+\subsection{Dockerfile Analysis}
+
+The \texttt{Dockerfile} is kept intentionally lightweight. By excluding large dependencies like \texttt{torch} from the \texttt{pip install} command, the image size remains very small (only containing the base Python runtime and lightweight web frameworks).
+
+\begin{lstlisting}[language=Dockerfile, caption={Optimized Inference Dockerfile}, label={lst:dockerfile_inference}]
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+
+# Critical: Point Python to the external volume
+ENV PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages
+
+WORKDIR /app
+
+# Only install lightweight app dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install fastapi==0.110.0 uvicorn==0.29.0 python-multipart==0.0.9
+
+COPY app.py model.py model.pt ./
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{Base Image:} Uses \texttt{python:3.12-slim} to minimise the OS footprint.
+    \item \textbf{Environment Configuration:} 
+    \begin{itemize}
+        \item \texttt{PYTHONDONTWRITEBYTECODE=1}: Prevents Python from writing \texttt{.pyc} files to disk.
+        \item \textbf{\texttt{PYTHONPATH}}: Crucially set to \texttt{/external-libs/ml\_env/lib/python3.12/site-packages}. This instructs the Python interpreter to look for libraries in the mounted volume directory, not just the default system paths.
+    \end{itemize}
+    \item \textbf{Minimal Dependencies:} The \texttt{pip install} command only installs \texttt{fastapi}, \texttt{uvicorn}, and \texttt{python-multipart}. Heavy ML libraries are assumed to be present in the mounted volume.
+\end{itemize}
+
+\subsection{Volume Mounting Strategy}
+
+The strategy relies on two shell scripts to set up the environment on the host machine and run the container with the correct volume mappings.
+
+\subsubsection{Library Setup (\texttt{mount\_libs.sh})}
+This script runs on the host machine (or a VM node) to prepare the shared library volume.
+\begin{enumerate}
+    \item \textbf{NFS Client Installation:} It installs \texttt{nfs-common} to enable Network File System capabilities.
+    \item \textbf{Mounting:} It connects to a remote NFS server (\texttt{172.16.203.14}) where the pre-installed ML libraries reside.
+    \item \textbf{Local Path:} The remote libraries are mounted to \texttt{/mnt/ml-libs} on the host. This directory acts as the bridge between the NFS server and the Docker container.
+\end{enumerate}
+
+\subsubsection{Runtime Execution (\texttt{run\_container.sh})}
+This script launches the Docker container with the necessary runtime configurations to access the external libraries.
+
+\begin{lstlisting}[language=Bash, caption={Container Execution Command}]
+docker run -d \
+  -v /mnt/ml-libs:/external-libs \
+  -e PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages \
+  -p 8000:8000 \
+  fastapi-ml-app
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{\texttt{-v /mnt/ml-libs:/external-libs}}: This bind mount maps the host's \texttt{/mnt/ml-libs} (which contains the NFS data) to \texttt{/external-libs} inside the container.
+    \item \textbf{\texttt{-e PYTHONPATH=...}}: explicit environment variable override ensures the container's Python runtime finds the packages in \texttt{/external-libs}.
+\end{itemize}
+
+\subsection{Benefits and Optimization}
+
+\begin{table}[h!]
+\centering
+\caption{Optimization Benefits} 
+\label{tab:docker_optimization}
+\begin{tabular}{|l|p{6cm}|p{6cm}|}
+\hline
+\textbf{Feature} & \textbf{Standard Approach} & \textbf{Volume Mount Approach} \\ \hline
+\textbf{Image Size} & \textbf{Huge} ($>2GB$). Includes PyTorch, CUDA binaries, and all dependencies. & \textbf{Tiny} (~100MB). Only contains app code and minimal HTTP libs. \\ \hline
+\textbf{Build Time} & \textbf{Slow}. Downloading and installing PyTorch takes minutes. & \textbf{Fast}. setup only installs \texttt{fastapi}. \\ \hline
+\textbf{Updates} & requires rebuilding and pushing large layers for every code change. & Code changes only require rebuilding the tiny app layer. Library updates are handled externally. \\ \hline
+\end{tabular}
+\end{table}
+
+This architecture allows for rapid deployment and updating of the application logic without the overhead of moving gigabytes of container layers for unchanged machine learning dependencies.
+
+\section{Rust: CNN Model Architecture and Training Performance}
+
+The convolutional neural network (CNN) model used for the experiment consisted of two convolutional layers followed by adaptive average pooling, dropout, and two fully connected layers. The complete architecture is shown below:
+
+\begin{verbatim}
+Model {
+  conv1: Conv2d {ch_in: 1, ch_out: 8, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 80}
+  conv2: Conv2d {ch_in: 8, ch_out: 16, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 1168}
+  pool: AdaptiveAvgPool2d {output_size: [8, 8]}
+  dropout: Dropout {prob: 0.5}
+  linear1: Linear {d_input: 1024, d_output: 512, bias: true, params: 524800}
+  linear2: Linear {d_input: 512, d_output: 10, bias: true, params: 5130}
+  activation: Relu
+  params: 531178
+}
+\end{verbatim}
+
+The model was trained for 10 epochs. Over the course of training, both the training and validation performance improved consistently. Training accuracy increased from 81.575\% in the first epoch to 97.300\% in the final epoch, while validation accuracy improved from 92.133\% to 98.517\%.
+
+Similarly, the training loss decreased significantly from 0.656 to 0.087, and the validation loss reduced from 0.258 to 0.054 by the end of training. The macro F1-score also improved substantially, reaching 96.974\% for training and 98.321\% for validation.
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Metrics Summary}
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min.} & \textbf{Epoch} & \textbf{Max.} & \textbf{Epoch} \\
+\hline
+Train & Accuracy & 81.575 & 1 & 97.300 & 10 \\
+Train & Loss & 0.087 & 10 & 0.656 & 1 \\
+Train & Precision@Top1 [Macro] & 82.126 & 1 & 97.304 & 10 \\
+Train & Recall@Top1 [Macro] & 81.286 & 1 & 97.232 & 10 \\
+Train & F1-Score@Top1 [Macro] & 79.715 & 1 & 96.974 & 10 \\
+Train & Top-5 Accuracy & 97.696 & 1 & 99.969 & 10 \\
+Train & CPU Memory (GB) & 2.514 & 2 & 2.927 & 10 \\
+Train & CPU Usage (\%) & 20.753 & 5 & 30.394 & 10 \\
+\hline
+Valid & Accuracy & 92.133 & 1 & 98.517 & 10 \\
+Valid & Loss & 0.054 & 10 & 0.258 & 1 \\
+Valid & Precision@Top1 [Macro] & 92.154 & 1 & 98.527 & 10 \\
+Valid & Recall@Top1 [Macro] & 91.978 & 1 & 98.425 & 10 \\
+Valid & F1-Score@Top1 [Macro] & 91.176 & 1 & 98.321 & 10 \\
+Valid & Top-5 Accuracy & 99.583 & 1 & 99.967 & 10 \\
+Valid & CPU Memory (GB) & 2.514 & 2 & 3.085 & 10 \\
+Valid & CPU Usage (\%) & 20.539 & 2 & 39.652 & 10 \\
+\hline
+\end{tabular}
+\label{tab:cnn_metrics_summary}
+\end{table}
+
+The results indicate that the model achieved strong generalization performance with minimal overfitting, as the validation accuracy remained slightly higher than the training accuracy throughout the experiment. The consistently high Top-5 accuracy values further demonstrate that the model was able to correctly identify the correct class within its top predictions.
+
+It should also be noted that the execution terminated with a segmentation fault after training completion. However, since the fault occurred after all epochs had been completed and metrics had already been recorded, it did not affect the validity of the training results. \\
+
+The time taken to train the model is 229.916s (3min 49.916s).
+
+
+
+\section{Python: CNN Model Architecture and Training Performance}
+
+The convolutional neural network (CNN) model implemented in Python mirrors the Rust architecture, consisting of two convolutional layers followed by adaptive average pooling, dropout regularization, and two fully connected layers.
+
+\textbf{Model Architecture:}
+
+\begin{verbatim}
+Model {
+  conv1: Conv2d {ch_in: 1, ch_out: 8, kernel_size: [3, 3], stride: [1, 1]}
+  conv2: Conv2d {ch_in: 8, ch_out: 16, kernel_size: [3, 3], stride: [1, 1]}
+  pool: AdaptiveAvgPool2d {output_size: [8, 8]}
+  dropout: Dropout {prob: 0.5}
+  linear1: Linear {d_input: 1024, d_output: 512, params: 524800}
+  linear2: Linear {d_input: 512, d_output: 10, params: 5130}
+  activation: ReLU
+  total params: 531178
+}
+\end{verbatim}
+
+The model was trained for 10 epochs. Training and validation performance improved consistently over time.
+
+Training accuracy increased from 82.01\% to 97.29\%, while validation accuracy improved from 92.87\% to 98.20\%. 
+Training loss decreased significantly from 0.5947 to 0.0867, and validation loss reduced from 0.2475 to 0.0579.
+
+The macro F1-score reached 0.9814, demonstrating strong classification performance. Additionally, the Top-5 accuracy achieved 99.98\%, indicating highly reliable predictions.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Accuracy & 82.01 & 1 & 97.29 & 10 \\
+Train & Loss & 0.0867 & 10 & 0.5947 & 1 \\
+Train & Precision@Top1 [Macro] & -- & -- & -- & -- \\
+Train & Recall@Top1 [Macro] & -- & -- & -- & -- \\
+Train & F1-Score@Top1 [Macro] & -- & -- & -- & -- \\
+Train & Top-5 Accuracy & -- & -- & -- & -- \\
+Train & CPU Memory (GB) & 0.84 & -- & 0.98 & -- \\
+Train & CPU Usage (\%) & 72.1 & -- & 92.0 & -- \\
+\hline
+
+Valid & Accuracy & 92.87 & 1 & 98.20 & 10 \\
+Valid & Loss & 0.0579 & 10 & 0.2475 & 1 \\
+Valid & Precision@Top1 [Macro] & 0.9816 & -- & 0.9816 & -- \\
+Valid & Recall@Top1 [Macro] & 0.9812 & -- & 0.9812 & -- \\
+Valid & F1-Score@Top1 [Macro] & 0.9814 & -- & 0.9814 & -- \\
+Valid & Top-5 Accuracy & 99.98 & -- & 99.98 & -- \\
+Valid & CPU Memory (GB) & 0.84 & -- & 0.98 & -- \\
+Valid & CPU Usage (\%) & 72.1 & -- & 92.0 & -- \\
+\hline
+
+\end{tabular}
+\caption{Python Training and Validation Metrics Summary}
+\end{table}
+
+The results indicate strong generalization performance with no signs of overfitting. Validation accuracy remained consistently high and closely followed training accuracy.
+
+Training was stable with zero NaN events observed. The total training time was 182.23 seconds, with an average epoch time of 15.05 seconds and an average iteration speed of 50.58 iterations per second.
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size &  3.98GB &  1.02GB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
+
+\end{document}

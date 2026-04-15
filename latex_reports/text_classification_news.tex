@@ -1,0 +1,652 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx} 
+\usepackage{booktabs}
+\usepackage{hyperref} 
+\usepackage{enumitem} 
+\usepackage{array}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{pdfpages}
+
+
+\lstdefinelanguage{Dockerfile}{
+  keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
+  sensitive=true,
+  comment=[l]{\#},
+  morestring=[b]",
+}
+
+\title{\textbf{Text Classification}} 
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Model Architecture and Training Strategy}
+
+The text classification system is built using the \texttt{Burn} framework in Rust, leveraging a Transformer-based architecture for feature extraction and a linear classification head. This section details the mathematical formulation of the model and the strategy employed for training.
+
+\subsection{Model Architecture}
+The core of the model is a Transformer Encoder, which processes a sequence of token embeddings to capture contextual relationships. The architecture consists of three primary stages: embedding, encoding, and classification.
+
+\subsubsection{Embedding Layer}
+Input text is tokenized and converted into a sequence of indices $X \in \mathbb{N}^{B \times L}$, where $B$ is the batch size and $L$ is the sequence length. The model utilizes two parallel embedding layers:
+\begin{enumerate}
+    \item \textbf{Token Embedding ($E_{tok}$)}: Maps token indices to dense vectors of dimension $d_{model}$.
+    \item \textbf{Positional Embedding ($E_{pos}$)}: Maps position indices $[0, \dots, L-1]$ to dense vectors of dimension $d_{model}$ to inject sequence order information.
+\end{enumerate}
+
+The final embedding representation $E$ is obtained by averaging the token and positional embeddings:
+\begin{equation}
+    E = \frac{E_{tok}(X) + E_{pos}(\text{positions})}{2}
+\end{equation}
+
+\subsubsection{Transformer Encoder}
+The embedding tensor $E$ is passed through a multi-layer Transformer Encoder. Each layer consists of a Multi-Head Self-Attention (MHSA) mechanism followed by a Position-wise Feed-Forward Network (FFN), with residual connections and layer normalization. 
+
+The configuration used in this implementation is as follows:
+\begin{itemize}
+    \item \textbf{Model Dimension ($d_{model}$)}: 256
+    \item \textbf{Feed-Forward Dimension ($d_{ff}$)}: 1024
+    \item \textbf{Number of Heads ($N_{heads}$)}: 8
+    \item \textbf{Number of Layers ($N_{layers}$)}: 4
+    \item \textbf{Normalization}: Layer norm applied before sub-layers (Pre-Norm).
+\end{itemize}
+
+Let $H = \text{TransformerEncoder}(E)$, where $H \in \mathbb{R}^{B \times L \times d_{model}}$ represents the contextualized representations of the input sequence.
+
+\subsubsection{Classification Head}
+For classification, the model utilizes the representation of the first token (typically acting as the [CLS] token) from the encoded sequence. This vector is passed through a linear layer to project it into the class space:
+\begin{equation}
+    Y = \text{Linear}(H_{[:, 0, :]})
+\end{equation}
+where $Y \in \mathbb{R}^{B \times N_{classes}}$ represents the logits. For inference, a Softmax function is applied to obtain probabilities:
+\begin{equation}
+    \hat{P} = \text{Softmax}(Y)
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{Model Architecture Summary}
+\label{tab:model_arch}
+\begin{tabular}{|l|l|c|c|}
+\hline
+\textbf{Component} & \textbf{Configuration / Details} & \textbf{Input Shape} & \textbf{Output Shape} \\ \hline
+Token Embedding & $V \to d_{model}$ ($V$: Vocab Size) & $(B, L)$ & $(B, L, 256)$ \\ \hline
+Pos Embedding & $L_{max} \to d_{model}$ & $(B, L)$ & $(B, L, 256)$ \\ \hline
+Embedding Merge & Average ($E_{tok} + E_{pos}$) & - & $(B, L, 256)$ \\ \hline
+Transformer Block & 4 Layers, 8 Heads, $d_{ff}=1024$ & $(B, L, 256)$ & $(B, L, 256)$ \\ \hline
+Feature Extract & Slice First Token (Index 0) & $(B, L, 256)$ & $(B, 256)$ \\ \hline
+Classifier Head & Linear ($256 \to N_{classes}$) & $(B, 256)$ & $(B, N_{classes})$ \\ \hline
+\end{tabular}
+\end{table}
+
+
+
+\section{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{RustLocust/text.pdf}
+
+
+\section{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{PythonLocust/text.pdf}
+
+
+\subsection{Training Strategy}
+The model is trained using a supervised learning approach with the following configuration:
+
+\subsubsection{Loss Function}
+The training objective is to minimize the Cross-Entropy Loss between the predicted logits $Y$ and the ground truth class labels $C$:
+\begin{equation}
+    \mathcal{L} = \text{CrossEntropy}(Y, C) = -\sum_{c=1}^{N_{classes}} \mathbb{1}_{c=C} \log\left(\frac{e^{Y_c}}{\sum_{j} e^{Y_j}}\right)
+\end{equation}
+
+\subsubsection{Optimization}
+We employ the **Adam** optimizer with the following parameters:
+\begin{itemize}
+    \item \textbf{Weight Decay}: $5 \times 10^{-5}$
+    \item \textbf{Beta Coefficients}: Standard defaults (typically $\beta_1=0.9, \beta_2=0.999$)
+\end{itemize}
+
+\subsubsection{Learning Rate Scheduling}
+A **Noam Learning Rate Scheduler** is used to stabilize training. The learning rate increases linearly during a warmup phase and then decays proportionally to the inverse square root of the step number.
+\begin{equation}
+    LR = d_{model}^{-0.5} \cdot \min(step\_num^{-0.5}, step\_num \cdot warmup\_steps^{-1.5})
+\end{equation}
+\begin{itemize}
+    \item \textbf{Warmup Steps}: 1000
+    \item \textbf{Base Learning Rate}: 0.01
+\end{itemize}
+
+\subsubsection{Metrics}
+During training and validation, the following metrics are tracked to monitor performance:
+\begin{itemize}
+    \item \textbf{Loss}: Cross-Entropy Loss.
+    \item \textbf{Accuracy}: Percentage of correct predictions.
+    \item \textbf{F1-Score, Precision, Recall}: Macro-averaged metrics to account for class balance.
+\end{itemize}
+
+\section{Burn Code Specifications}
+
+This section outlines the significant implementation details of the text classification system, focusing on the architectural choices in \texttt{model.rs} and the robust training pipeline defined in \texttt{training.rs}.
+\subsection{Model Implementation (\texttt{model.rs})}
+The \texttt{TextClassificationModel} leverages the \textbf{Burn} framework's modular design to implement a Transformer-based classifier. Key features of this implementation include:
+\begin{itemize}
+    \item \textbf{Dual Embedding Strategy:} The model employs two distinct embedding layers: \texttt{embedding\_token} for semantic content and \texttt{embedding\_pos} for positional information. A unique characteristic of this implementation is the fusion strategy, where these embeddings are combined via averaging:
+    \[
+    E_{final} = \frac{E_{pos} + E_{token}}{2}
+    \]
+    This differs from the standard summation approach often found in BERT implementations, potentially stabilizing the initial magnitude of the embedding vectors.
+    
+    \item \textbf{Configurable Architecture:} The system uses a \texttt{TextClassificationModelConfig} struct derived with the \texttt{Config} macro. This allows for type-safe and serializable hyperparameter management, ensuring the model architecture (hidden size, vocabulary size, sequence length) can be easily saved, loaded, and reproducible.
+    
+    \item \textbf{Masked Attention:} The forward pass actively utilizes padding masks (\texttt{mask\_pad}). These masks are passed into the \texttt{TransformerEncoderInput}, ensuring that the self-attention mechanism strictly ignores padding tokens, which is critical for handling variable-length text sequences correctly.
+    
+    \item \textbf{Separation of Train and Inference Logic:} The model explicitly implements the \texttt{TrainStep} and \texttt{InferenceStep} traits. 
+    \begin{itemize}
+        \item \textbf{Training:} Returns a \texttt{ClassificationOutput} struct containing the calculated Cross-Entropy loss for backpropagation.
+        \item \textbf{Inference:} Returns raw probabilities by applying a softmax activation on the output logits, facilitating direct class prediction.
+    \end{itemize}
+\end{itemize}
+\subsection{Training Pipeline (\texttt{training.rs})}
+The training module is designed for reliability and comprehensive observability. It integrates advanced optimization techniques and hardware-aware monitoring.
+\begin{itemize}
+    \item \textbf{Noam Scheduler:} Transformer models are notoriously sensitive to learning rates. The code implements the \textbf{Noam Learning Rate Scheduler} (popularized by "Attention Is All You Need"), which features a linear warmup phase (1000 steps) followed by an inverse square root decay based on the model dimension ($d_{model}$). This prevents gradient explosions during early training stages.
+    
+    \item \textbf{Distributed Training Support:} The implementation explicitly handles distributed computing scenarios. It utilizes Rust's feature flags (\texttt{cfg[feature = "ddp"]}) to switch between single-device training and \textbf{Distributed Data Parallel (DDP)} strategies. When enabled, it employs a tree-based \texttt{AllReduceStrategy} for synchronizing gradients across multiple GPUs or nodes.
+    
+    \item \textbf{Comprehensive Telemetry:} The training loop is instrumented with an extensive suite of metrics beyond simple accuracy. It tracks:
+    \begin{itemize}
+        \item \textbf{Classification Metrics:} Macro-averaged F1-Score, Precision, and Recall, providing a holistic view of model performance on imbalanced datasets.
+        \item \textbf{Hardware Diagnostics:} CPU temperature, memory usage, and utilization are logged alongside training progress, aiding in the detection of thermal throttling or memory leaks during long training runs.
+    \end{itemize}
+    
+    \item \textbf{Efficient Data Sampling:} To manage large datasets efficiently, the loader utilizes a \texttt{SamplerDataset}. This limits the effective epoch size to 50,000 training samples and 5,000 validation samples, allowing for rapid iteration and feedback loops without needing to process the entire corpus in every epoch.
+\end{itemize}
+
+\subsection{Conditional Compilation}
+I think we should document a bit about this. 
+
+\section{Rust Docker image}
+
+\section{Rust Inference Code}
+
+\section{Rust: Transformer-Based Text Classification Model Performance}
+
+The text classification model used in this experiment was based on a Transformer encoder architecture. The model consisted of token embeddings, positional embeddings, a multi-layer Transformer encoder, and a final linear classification layer.
+
+\subsection{Model Architecture}
+
+The architecture of the model is shown below:
+
+\begin{verbatim}
+TextClassificationModel {
+  transformer: TransformerEncoder {
+    d_model: 256,
+    d_ff: 1024,
+    n_heads: 8,
+    n_layers: 4,
+    dropout: 0.1,
+    norm_first: true,
+    quiet_softmax: true,
+    params: 3159040
+  }
+  embedding_token: Embedding {
+    n_embedding: 28996,
+    d_model: 256,
+    params: 7422976
+  }
+  embedding_pos: Embedding {
+    n_embedding: 256,
+    d_model: 256,
+    params: 65536
+  }
+  output: Linear {
+    d_input: 256,
+    d_output: 4,
+    bias: true,
+    params: 1028
+  }
+  n_classes: 4
+  params: 10648580
+}
+\end{verbatim}
+
+The Transformer encoder used four encoder layers with eight attention heads per layer. Each layer had a model dimension of 256 and a feed-forward dimension of 1024. A dropout rate of 0.1 was used to reduce overfitting.
+
+The token embedding layer mapped a vocabulary of 28,996 tokens into 256-dimensional vectors. Positional embeddings of length 256 were also used so that the Transformer could capture token order information.
+
+The final output layer mapped the Transformer representation into four output classes.
+
+The total number of trainable parameters in the model was 10,648,580.
+
+\subsection{Training Configuration}
+
+The model was trained for a total of 5 epochs. During training, the learning rate decayed from $1.107 \times 10^{-5}$ in the first epoch to $3.733 \times 10^{-6}$ in the final epoch.
+
+\subsection{Training Performance}
+
+Training accuracy improved steadily from 57.968\% in the first epoch to 81.474\% in the fifth epoch. Similarly, the training loss decreased from 0.981 to 0.507.
+
+The macro precision, recall, and F1-score also improved significantly during training:
+
+\begin{itemize}
+    \item Precision increased from 58.893\% to 81.606\%
+    \item Recall increased from 57.741\% to 81.334\%
+    \item F1-score increased from 50.201\% to 76.001\%
+\end{itemize}
+
+These results indicate that the model learned meaningful semantic patterns in the text data over successive epochs.
+
+\subsection{Validation Performance}
+
+Validation performance also improved consistently. Validation accuracy increased from 72.280\% in the first epoch to a maximum of 81.640\% in the fourth epoch.
+
+The validation loss decreased from 0.731 to 0.507, showing that the model generalized reasonably well to unseen data.
+
+The validation precision, recall, and F1-score also showed strong improvement:
+
+\begin{itemize}
+    \item Precision increased from 72.230\% to 81.739\%
+    \item Recall increased from 72.258\% to 82.039\%
+    \item F1-score increased from 65.796\% to 76.509\%
+\end{itemize}
+
+The relatively close values between training and validation accuracy suggest that the model did not suffer from severe overfitting.
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Metrics Summary for the Transformer-Based Text Classification Model}
+% @kumar please layout sahi kar sakta hai? love you
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min.} & \textbf{Epoch} & \textbf{Max.} & \textbf{Epoch} \\
+\hline
+Train & Accuracy & 57.968 & 1 & 81.474 & 5 \\
+Train & Loss & 0.507 & 5 & 0.981 & 1 \\
+Train & Precision@Top1 [Macro] & 58.893 & 1 & 81.606 & 5 \\
+Train & Recall@Top1 [Macro] & 57.741 & 1 & 81.334 & 5 \\
+Train & F1-Score@Top1 [Macro] & 50.201 & 1 & 76.001 & 5 \\
+Train & Learning Rate & $3.733 \times 10^{-6}$ & 5 & $1.107 \times 10^{-5}$ & 1 \\
+Train & CPU Memory (GB) & 2.401 & 2 & 2.736 & 5 \\
+Train & CPU Usage (\%) & 16.529 & 1 & 17.160 & 5 \\
+\hline
+Valid & Accuracy & 72.280 & 1 & 81.640 & 4 \\
+Valid & Loss & 0.507 & 5 & 0.731 & 1 \\
+Valid & Precision@Top1 [Macro] & 72.230 & 1 & 81.739 & 5 \\
+Valid & Recall@Top1 [Macro] & 72.258 & 1 & 82.039 & 5 \\
+Valid & F1-Score@Top1 [Macro] & 65.796 & 1 & 76.509 & 5 \\
+Valid & CPU Memory (GB) & 2.263 & 1 & 2.747 & 5 \\
+Valid & CPU Usage (\%) & 20.331 & 1 & 22.190 & 3 \\
+\hline
+\end{tabular}
+\label{tab:transformer_text_classification_metrics}
+\end{table}
+
+\subsection{Resource Utilization}
+
+The CPU memory usage remained relatively stable throughout training. Training memory usage ranged from 2.401 GB to 2.736 GB, while validation memory usage ranged from 2.263 GB to 2.747 GB.
+
+CPU utilization also remained moderate, with training CPU usage ranging from 16.529\% to 17.160\% and validation CPU usage ranging from 20.331\% to 22.190\%.
+
+CPU temperature values were unavailable during the experiment and therefore recorded as NaN.
+
+\subsection{Execution Time and Failure}
+
+The complete training run required:
+
+\begin{itemize}
+    \item Real time: 32 minutes and 37.872 seconds
+    \item User CPU time: 36 minutes and 52.313 seconds
+    \item System CPU time: 1 minute and 41.258 seconds
+\end{itemize}
+
+\section{PyTorch Training Pipeline}
+This section details the Python implementation of the text classification training pipeline. The code mimics the architecture and logic of the Rust version to ensuring comparable performance and behavior.
+\subsection{Code Highlights}
+\begin{itemize}
+    \item \textbf{Custom Transformer Model:}
+    The \texttt{TextClassificationModel} is a custom \texttt{nn.Module} containing:
+    \begin{itemize}
+        \item Dual embedding layers (\texttt{embedding\_token} and \texttt{embedding\_pos}).
+        \item A unique fusion strategy averaging the two embeddings: $E = (E_{pos} + E_{tok}) / 2$.
+        \item A standard \texttt{TransformerEncoder} stack.
+        \item A classification head that projects the encoded features to the 4 output classes of the AG News dataset.
+    \end{itemize}
+    \item \textbf{Noam Learning Rate Scheduler:}
+    A custom \texttt{NoamLR} scheduler is implemented to replicate the specific warmup and decay behavior used in the Rust implementation (and the original "Attention Is All You Need" paper).
+    \[
+    lr = \text{factor} \cdot (d_{model}^{-0.5}) \cdot \min(step^{-0.5}, step \cdot warmup^{-1.5})
+    \]
+    This ensures stable training dynamics for the Transformer architecture.
+    \item \textbf{Dataset Handling:}
+    The code utilizes the Hugging Face \texttt{datasets} library to load the "ag\_news" dataset. It explicitly shuffles and subsets the data (50,000 train, 5,000 test) to match the constraints applied in the Rust implementation, ensuring a fair apples-to-apples comparison between the two languages.
+    \item \textbf{Collate Function with Padding Masks:}
+    A custom \texttt{collate\_fn} handles dynamic batching. It tokenizes text using the \texttt{bert-base-cased} tokenizer and generates a boolean padding mask. Note the inversion logic: PyTorch's \texttt{TransformerEncoder} expects \texttt{True} for padded positions (unlike some other implementations where 1 implies validity), requiring careful mask generation:
+    \begin{verbatim}
+    mask_pad = (encoding['attention_mask'] == 0)
+    \end{verbatim}
+    \item \textbf{Training Loop:}
+    The training loop is a standard PyTorch implementation using \texttt{tqdm} for progress tracking. It uses \texttt{CrossEntropyLoss} as the criterion and the \texttt{Adam} optimizer. Crucially, the scheduler step is called after every batch (not every epoch), consistent with the Noam schedule requirements.
+\end{itemize}
+
+
+\section{Python: Text Classification (News) Transformer Model}
+
+The model is a Transformer-based architecture designed for multi-class news classification. It consists of a multi-layer encoder with multi-head self-attention and feedforward networks.
+
+\textbf{Model Architecture:}
+
+\begin{verbatim}
+Model {
+  transformer_encoder: {
+    d_model: 256,
+    nhead: 8,
+    num_layers: 4,
+    dim_feedforward: 1024
+  }
+  max_seq_len: 256
+  num_classes: 4
+  total params: 10649092
+}
+\end{verbatim}
+
+The model was trained for 5 epochs and showed steady convergence across all evaluation metrics.
+
+Training accuracy improved from 56.19\% to 79.70\%, while validation accuracy increased from 68.14\% to 79.00\%. 
+Training loss decreased from 1.0145 to 0.5483, and validation loss reduced from 0.8137 to 0.5628.
+
+The model achieved a macro F1-score of 0.7903 on the validation/test set, indicating reasonably strong classification performance for a Transformer trained over a small number of epochs.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Accuracy & 56.19 & 1 & 79.70 & 5 \\
+Train & Loss & 0.5483 & 5 & 1.0145 & 1 \\
+Train & Grad Norm (Total) & 10.39 & 4 & 22.95 & 3 \\
+Train & Iteration Speed (it/s) & 44.33 & 2 & 45.05 & 1 \\
+Train & CPU Memory (GB) & 1.12 & -- & 1.12 & -- \\
+Train & CPU Usage (\%) & 22.2 & -- & 23.5 & -- \\
+\hline
+
+Valid & Accuracy & 68.14 & 1 & 79.00 & 5 \\
+Valid & Loss & 0.5628 & 5 & 0.8137 & 1 \\
+Valid & Precision@Top1 [Macro] & 0.7187 & 1 & 0.7942 & 5 \\
+Valid & Recall@Top1 [Macro] & 0.6815 & 1 & 0.7899 & 5 \\
+Valid & F1-Score@Top1 [Macro] & 0.6773 & 1 & 0.7903 & 5 \\
+Valid & Iteration Speed (it/s) & 44.33 & 2 & 45.05 & 1 \\
+Valid & CPU Memory (GB) & 1.12 & -- & 1.12 & -- \\
+Valid & CPU Usage (\%) & 22.2 & -- & 23.5 & -- \\
+\hline
+
+\end{tabular}
+\caption{Transformer Text Classification Training and Validation Metrics}
+\end{table}
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 706.99 seconds
+    \item Average Epoch Time: 139.83 seconds
+    \item Iteration Speed (Mean): 44.70 it/s
+    \item Gradient Norm (Mean): 15.75
+    \item GPU Memory Usage: 178.79 MB
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+The results indicate stable training and consistent improvement across epochs. While performance is lower than simpler CNN-based tasks, this is expected due to the increased complexity of natural language understanding tasks.
+
+\section{PyTorch Inference Pipeline Docker Image: Hybrid NFS and Docker Inference Architecture}
+
+This section details the hybrid deployment strategy designed to optimize Docker image size and leverage a centralized machine learning environment. The architecture splits the responsibilities between a \textbf{Library VM} (storage-heavy) and a \textbf{Docker VM} (compute-centric).
+
+\subsection{Architecture Overview}
+
+The system comprises two primary components:
+\begin{enumerate}
+    \item \textbf{Library VM (NFS Server)}: Hosts the heavy Python environment, including PyTorch, Transformers, and CUDA libraries. This environment is exported via NFS.
+    \item \textbf{Docker VM (Inference Client)}: Runs a lightweight Docker container that mounts the external libraries at runtime.
+\end{enumerate}
+
+\subsection{Implementation Details}
+
+\subsubsection{1. Library Sharing via NFS}
+The Library VM exports the directory containing the Python site-packages. On the Docker VM, this directory is mounted using the \texttt{mount\_libs.sh} script.
+
+\begin{lstlisting}[language=bash, caption={Mounting the NFS Library Volume}]
+# Configuration from mount_libs.sh
+NFS_SERVER_IP="172.16.203.14" 
+NFS_EXPORT_PATH="/home/iiitb/Documents/textClassificationVolume"
+LOCAL_MOUNT_POINT="/mnt/text-libs"
+
+# Mounting the remote volume
+sudo mount -t nfs "$NFS_SERVER_IP:$NFS_EXPORT_PATH" "$LOCAL_MOUNT_POINT"
+\end{lstlisting}
+
+\subsubsection{2. Lightweight Docker Image}
+The Docker image is built using \texttt{Dockerfile.cpu} and excludes heavy ML libraries. It only contains the application code, the model weights, and minimal system dependencies.
+
+\begin{lstlisting}[language=Dockerfile, caption={Dockerfile.cpu Configuration}]
+FROM python:3.12-slim
+
+# Point Python to the external NFS mount
+ENV PYTHONPATH=/external-libs/text_env/lib/python3.12/site-packages
+
+# Copy only the app and model
+COPY app.py ./
+COPY model_pytorch_text_classification/ag_news_model.pth ./model/
+
+# No 'pip install torch' is performed here!
+\end{lstlisting}
+
+\subsubsection{3. Runtime Execution}
+The container is launched via \texttt{run\_inference.sh}, which mounts the NFS volume into the container at \texttt{/external-libs}.
+
+\begin{lstlisting}[language=bash, caption={Mounting the NFS Library Volume}]
+docker run --gpus all \
+  -v /mnt/text-libs:/external-libs \
+  -v text_model_vol:/models \
+  -e PYTHONPATH=/external-libs/text_env/lib/python3.12/site-packages \
+  -p 8000:8000 \
+  text_classification_image
+\end{lstlisting}
+
+\subsection{Impact on Image Size}
+
+This architecture drastically reduces the storage footprint of the inference artifact. By decoupling the static libraries from the application logic, we achieve the following reduction:
+
+% \begin{table}[h]
+% \centering
+% \begin{tabular}{|l|c|c|}
+% \hline
+% \textbf{Component} & \textbf{Traditional Approach} & \textbf{Hybrid NFS Approach} \\ \hline
+% Base Image (Python Slim) & $\sim$150 MB & $\sim$150 MB \\ \hline
+% PyTorch & $\sim$3.5 GB & \textbf{0 MB (Mounted)} \\ \hline
+% Transformers & $\sim$500 MB & \textbf{0 MB (Mounted)} \\ \hline
+% Application Code & $<1$ MB & $<1$ MB \\ \hline
+% Model Weights & $\sim$100 MB & $\sim$100 MB \\ \hline
+% \textbf{Total Image Size} & \textbf{8.93 GB} & \textbf{$~250$ MB} \\ \hline
+% \end{tabular}
+% \caption{Comparison of Docker Image Sizes}
+% \end{table}
+
+% This \textbf{99.03\% reduction} in image size results in:
+% \begin{itemize}
+%     \item Faster deployment and rollback times.
+%     \item Significantly lower network bandwidth usage.
+%     \item Efficient storage utilization on the Docker VM.
+% \end{itemize}
+
+\section{Hybrid Inference Architecture with NFS and Docker}
+
+This section outlines the architectural design of our hybrid machine learning deployment strategy, detailing the distinct roles of the Library VM and the Docker VM, and how they interact to optimize resource usage.
+
+\subsection{Library Virtual Machine (NFS Server)}
+
+The \textbf{Library VM} serves as the centralized repository for the heavy components of the machine learning environment. Its primary function is to host large, static dependencies such as the Python runtime environment, deep learning frameworks (e.g., PyTorch, TensorFlow), and specialized libraries (e.g., Transformers, CUDA routines).
+
+By consolidating these resource-intensive libraries on a single machine, we avoid the redundancy of installing them on every inference node. This machine acts as a Network File System (NFS) server, exporting its directory structure to be accessed by other machines in the network.
+
+\subsubsection{What is an NFS Server?}
+
+A \textbf{Network File System (NFS)} server is a computer that allows other machines (clients) to access its files over a network as if they were stored locally. In our architecture, the NFS server "shares" the directory containing the Python libraries. The client machines can then read these files directly, eliminating the need to physically copy the heavy libraries to each client.
+
+\subsection{Docker Virtual Machine (Inference Node)}
+
+The \textbf{Docker VM} is the compute-centric node responsible for executing the inference workload. It hosts the Docker engine and runs the lightweight containerized application.
+
+This machine does not permanently store the heavy ML libraries. instead, it mounts the shared directory from the Library VM at runtime. reliable network connectivity to the Library VM ensures that the Docker container has immediate access to the necessary software dependencies.
+
+\subsection{Hybrid Deployment Strategy}
+
+The hybrid strategy combines the isolation and portability of Docker with the efficiency of centralized storage.
+
+\begin{enumerate}
+    \item \textbf{Decoupling Environment and Application}: We separate the rapidly changing application code (API logic, business rules) from the slowly changing environment (Python packages). The application code resides inside the Docker image, while the environment resides on the NFS share.
+    \item \textbf{Runtime Linking}: When the Docker container starts, it mounts the NFS share. The container's environment variables are configured to add this mounted path to its Python path. This allows the Python interpreter inside the container to import modules (like \texttt{torch} or \texttt{transformers}) from the network share as if they were installed locally.
+    \item \textbf{Drastic Image Reduction}: Since the Docker image only contains the application code and minimal system dependencies, its size is reduced from several gigabytes to a few hundred megabytes. This facilitates rapid deployments, faster scaling, and reduced storage costs.
+\end{enumerate}
+
+This architecture essentially transforms the Docker container into a lightweight "shell" that borrows its heavy "engine" from the Library VM only when needed.
+
+\subsection{Identifying the Virtual Machine Roles}
+
+The architecture explicitly designates two separate machines for distinct purposes. Based on the configuration scripts, their roles are defined as follows:
+
+\subsubsection{1. The Library VM (Environment Host)}
+This machine acts as the \textbf{storage backend} for the machine learning environment.
+\begin{itemize}
+    \item \textbf{Role}: It hosts the actual Python environment (Torch, Transformers, etc.) on its local filesystem and exports it via NFS.
+    \item \textbf{Identifier}: In our configuration (see \texttt{mount\_libs.sh}), this machine is identified by the IP address \texttt{172.16.203.14}.
+    \item \textbf{Key Path}: The environment resides at \texttt{/home/iiitb/Documents/textClassificationVolume}.
+    \item \textbf{Action}: It does \textit{not} run the Docker container. Ideally, it simply stays online to serve files to other machines.
+\end{itemize}
+
+\subsubsection{2. The Docker VM (Inference Runner)}
+This machine acts as the \textbf{compute frontend} that serves the API.
+\begin{itemize}
+    \item \textbf{Role}: It builds and runs the lightweight Docker container. It does not have the deep learning libraries installed on its own disk; it borrows them from the Library VM.
+    \item \textbf{Identifier}: This is the machine where you execute the \texttt{mount\_libs.sh} and \texttt{run\_inference.sh} scripts.
+    \item \textbf{Key Path}: It mounts the remote library to the local path \texttt{/mnt/text-libs}.
+    \item \textbf{Action}: It executes the \texttt{docker run} command, effectively "bringing the code to the data" (or in this case, bringing the library data to the code container).
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Feature} & \textbf{Library VM} & \textbf{Docker VM} \\ \hline
+\textbf{Primary Function} & Storage \& NFS Server & Model Inference \& API Hosting \\ \hline
+\textbf{IP Address} & \texttt{172.16.203.14} & (Assigned by Network) \\ \hline
+\textbf{Python Libs} & Stored Physically on Disk & Mounted via Network (NFS) \\ \hline
+\textbf{Docker Image} & Not required & Builds \& Runs Lightweight Image \\ \hline
+\end{tabular}
+\caption{Distinction between Library VM and Docker VM}
+\end{table}
+
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size & 4.02 GB & $\sim$1 GB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
+
+\end{document}
