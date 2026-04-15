@@ -6,11 +6,13 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx} 
 \usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{enumitem}
+\usepackage{hyperref} 
+\usepackage{enumitem} 
 \usepackage{array}
 \usepackage{float}
 \usepackage{listings}
+\usepackage{pdfpages}
+
 
 \lstdefinelanguage{Dockerfile}{
   keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
@@ -19,7 +21,7 @@
   morestring=[b]",
 }
 
-\title{\textbf{Text Classification (News)}}
+\title{\textbf{Text Classification}} 
 \date{\today}
 
 \begin{document}
@@ -84,6 +86,50 @@ Feature Extract & Slice First Token (Index 0) & $(B, L, 256)$ & $(B, 256)$ \\ \h
 Classifier Head & Linear ($256 \to N_{classes}$) & $(B, 256)$ & $(B, N_{classes})$ \\ \hline
 \end{tabular}
 \end{table}
+
+
+
+\section{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{RustLocust/text.pdf}
+
+
+\section{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{PythonLocust/text.pdf}
+
 
 \subsection{Training Strategy}
 The model is trained using a supervised learning approach with the following configuration:
@@ -164,6 +210,136 @@ I think we should document a bit about this.
 
 \section{Rust Inference Code}
 
+\section{Rust: Transformer-Based Text Classification Model Performance}
+
+The text classification model used in this experiment was based on a Transformer encoder architecture. The model consisted of token embeddings, positional embeddings, a multi-layer Transformer encoder, and a final linear classification layer.
+
+\subsection{Model Architecture}
+
+The architecture of the model is shown below:
+
+\begin{verbatim}
+TextClassificationModel {
+  transformer: TransformerEncoder {
+    d_model: 256,
+    d_ff: 1024,
+    n_heads: 8,
+    n_layers: 4,
+    dropout: 0.1,
+    norm_first: true,
+    quiet_softmax: true,
+    params: 3159040
+  }
+  embedding_token: Embedding {
+    n_embedding: 28996,
+    d_model: 256,
+    params: 7422976
+  }
+  embedding_pos: Embedding {
+    n_embedding: 256,
+    d_model: 256,
+    params: 65536
+  }
+  output: Linear {
+    d_input: 256,
+    d_output: 4,
+    bias: true,
+    params: 1028
+  }
+  n_classes: 4
+  params: 10648580
+}
+\end{verbatim}
+
+The Transformer encoder used four encoder layers with eight attention heads per layer. Each layer had a model dimension of 256 and a feed-forward dimension of 1024. A dropout rate of 0.1 was used to reduce overfitting.
+
+The token embedding layer mapped a vocabulary of 28,996 tokens into 256-dimensional vectors. Positional embeddings of length 256 were also used so that the Transformer could capture token order information.
+
+The final output layer mapped the Transformer representation into four output classes.
+
+The total number of trainable parameters in the model was 10,648,580.
+
+\subsection{Training Configuration}
+
+The model was trained for a total of 5 epochs. During training, the learning rate decayed from $1.107 \times 10^{-5}$ in the first epoch to $3.733 \times 10^{-6}$ in the final epoch.
+
+\subsection{Training Performance}
+
+Training accuracy improved steadily from 57.968\% in the first epoch to 81.474\% in the fifth epoch. Similarly, the training loss decreased from 0.981 to 0.507.
+
+The macro precision, recall, and F1-score also improved significantly during training:
+
+\begin{itemize}
+    \item Precision increased from 58.893\% to 81.606\%
+    \item Recall increased from 57.741\% to 81.334\%
+    \item F1-score increased from 50.201\% to 76.001\%
+\end{itemize}
+
+These results indicate that the model learned meaningful semantic patterns in the text data over successive epochs.
+
+\subsection{Validation Performance}
+
+Validation performance also improved consistently. Validation accuracy increased from 72.280\% in the first epoch to a maximum of 81.640\% in the fourth epoch.
+
+The validation loss decreased from 0.731 to 0.507, showing that the model generalized reasonably well to unseen data.
+
+The validation precision, recall, and F1-score also showed strong improvement:
+
+\begin{itemize}
+    \item Precision increased from 72.230\% to 81.739\%
+    \item Recall increased from 72.258\% to 82.039\%
+    \item F1-score increased from 65.796\% to 76.509\%
+\end{itemize}
+
+The relatively close values between training and validation accuracy suggest that the model did not suffer from severe overfitting.
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Metrics Summary for the Transformer-Based Text Classification Model}
+% @kumar please layout sahi kar sakta hai? love you
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min.} & \textbf{Epoch} & \textbf{Max.} & \textbf{Epoch} \\
+\hline
+Train & Accuracy & 57.968 & 1 & 81.474 & 5 \\
+Train & Loss & 0.507 & 5 & 0.981 & 1 \\
+Train & Precision@Top1 [Macro] & 58.893 & 1 & 81.606 & 5 \\
+Train & Recall@Top1 [Macro] & 57.741 & 1 & 81.334 & 5 \\
+Train & F1-Score@Top1 [Macro] & 50.201 & 1 & 76.001 & 5 \\
+Train & Learning Rate & $3.733 \times 10^{-6}$ & 5 & $1.107 \times 10^{-5}$ & 1 \\
+Train & CPU Memory (GB) & 2.401 & 2 & 2.736 & 5 \\
+Train & CPU Usage (\%) & 16.529 & 1 & 17.160 & 5 \\
+\hline
+Valid & Accuracy & 72.280 & 1 & 81.640 & 4 \\
+Valid & Loss & 0.507 & 5 & 0.731 & 1 \\
+Valid & Precision@Top1 [Macro] & 72.230 & 1 & 81.739 & 5 \\
+Valid & Recall@Top1 [Macro] & 72.258 & 1 & 82.039 & 5 \\
+Valid & F1-Score@Top1 [Macro] & 65.796 & 1 & 76.509 & 5 \\
+Valid & CPU Memory (GB) & 2.263 & 1 & 2.747 & 5 \\
+Valid & CPU Usage (\%) & 20.331 & 1 & 22.190 & 3 \\
+\hline
+\end{tabular}
+\label{tab:transformer_text_classification_metrics}
+\end{table}
+
+\subsection{Resource Utilization}
+
+The CPU memory usage remained relatively stable throughout training. Training memory usage ranged from 2.401 GB to 2.736 GB, while validation memory usage ranged from 2.263 GB to 2.747 GB.
+
+CPU utilization also remained moderate, with training CPU usage ranging from 16.529\% to 17.160\% and validation CPU usage ranging from 20.331\% to 22.190\%.
+
+CPU temperature values were unavailable during the experiment and therefore recorded as NaN.
+
+\subsection{Execution Time and Failure}
+
+The complete training run required:
+
+\begin{itemize}
+    \item Real time: 32 minutes and 37.872 seconds
+    \item User CPU time: 36 minutes and 52.313 seconds
+    \item System CPU time: 1 minute and 41.258 seconds
+\end{itemize}
+
 \section{PyTorch Training Pipeline}
 This section details the Python implementation of the text classification training pipeline. The code mimics the architecture and logic of the Rust version to ensuring comparable performance and behavior.
 \subsection{Code Highlights}
@@ -192,6 +368,77 @@ This section details the Python implementation of the text classification traini
     \item \textbf{Training Loop:}
     The training loop is a standard PyTorch implementation using \texttt{tqdm} for progress tracking. It uses \texttt{CrossEntropyLoss} as the criterion and the \texttt{Adam} optimizer. Crucially, the scheduler step is called after every batch (not every epoch), consistent with the Noam schedule requirements.
 \end{itemize}
+
+
+\section{Python: Text Classification (News) Transformer Model}
+
+The model is a Transformer-based architecture designed for multi-class news classification. It consists of a multi-layer encoder with multi-head self-attention and feedforward networks.
+
+\textbf{Model Architecture:}
+
+\begin{verbatim}
+Model {
+  transformer_encoder: {
+    d_model: 256,
+    nhead: 8,
+    num_layers: 4,
+    dim_feedforward: 1024
+  }
+  max_seq_len: 256
+  num_classes: 4
+  total params: 10649092
+}
+\end{verbatim}
+
+The model was trained for 5 epochs and showed steady convergence across all evaluation metrics.
+
+Training accuracy improved from 56.19\% to 79.70\%, while validation accuracy increased from 68.14\% to 79.00\%. 
+Training loss decreased from 1.0145 to 0.5483, and validation loss reduced from 0.8137 to 0.5628.
+
+The model achieved a macro F1-score of 0.7903 on the validation/test set, indicating reasonably strong classification performance for a Transformer trained over a small number of epochs.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Accuracy & 56.19 & 1 & 79.70 & 5 \\
+Train & Loss & 0.5483 & 5 & 1.0145 & 1 \\
+Train & Grad Norm (Total) & 10.39 & 4 & 22.95 & 3 \\
+Train & Iteration Speed (it/s) & 44.33 & 2 & 45.05 & 1 \\
+Train & CPU Memory (GB) & 1.12 & -- & 1.12 & -- \\
+Train & CPU Usage (\%) & 22.2 & -- & 23.5 & -- \\
+\hline
+
+Valid & Accuracy & 68.14 & 1 & 79.00 & 5 \\
+Valid & Loss & 0.5628 & 5 & 0.8137 & 1 \\
+Valid & Precision@Top1 [Macro] & 0.7187 & 1 & 0.7942 & 5 \\
+Valid & Recall@Top1 [Macro] & 0.6815 & 1 & 0.7899 & 5 \\
+Valid & F1-Score@Top1 [Macro] & 0.6773 & 1 & 0.7903 & 5 \\
+Valid & Iteration Speed (it/s) & 44.33 & 2 & 45.05 & 1 \\
+Valid & CPU Memory (GB) & 1.12 & -- & 1.12 & -- \\
+Valid & CPU Usage (\%) & 22.2 & -- & 23.5 & -- \\
+\hline
+
+\end{tabular}
+\caption{Transformer Text Classification Training and Validation Metrics}
+\end{table}
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 706.99 seconds
+    \item Average Epoch Time: 139.83 seconds
+    \item Iteration Speed (Mean): 44.70 it/s
+    \item Gradient Norm (Mean): 15.75
+    \item GPU Memory Usage: 178.79 MB
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+The results indicate stable training and consistent improvement across epochs. While performance is lower than simpler CNN-based tasks, this is expected due to the increased complexity of natural language understanding tasks.
 
 \section{PyTorch Inference Pipeline Docker Image: Hybrid NFS and Docker Inference Architecture}
 
@@ -252,27 +499,27 @@ docker run --gpus all \
 
 This architecture drastically reduces the storage footprint of the inference artifact. By decoupling the static libraries from the application logic, we achieve the following reduction:
 
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|c|c|}
-\hline
-\textbf{Component} & \textbf{Traditional Approach} & \textbf{Hybrid NFS Approach} \\ \hline
-Base Image (Python Slim) & $\sim$150 MB & $\sim$150 MB \\ \hline
-PyTorch & $\sim$3.5 GB & \textbf{0 MB (Mounted)} \\ \hline
-Transformers & $\sim$500 MB & \textbf{0 MB (Mounted)} \\ \hline
-Application Code & $<1$ MB & $<1$ MB \\ \hline
-Model Weights & $\sim$100 MB & $\sim$100 MB \\ \hline
-\textbf{Total Image Size} & \textbf{8.93 GB} & \textbf{88.5 MB} \\ \hline
-\end{tabular}
-\caption{Comparison of Docker Image Sizes}
-\end{table}
+% \begin{table}[h]
+% \centering
+% \begin{tabular}{|l|c|c|}
+% \hline
+% \textbf{Component} & \textbf{Traditional Approach} & \textbf{Hybrid NFS Approach} \\ \hline
+% Base Image (Python Slim) & $\sim$150 MB & $\sim$150 MB \\ \hline
+% PyTorch & $\sim$3.5 GB & \textbf{0 MB (Mounted)} \\ \hline
+% Transformers & $\sim$500 MB & \textbf{0 MB (Mounted)} \\ \hline
+% Application Code & $<1$ MB & $<1$ MB \\ \hline
+% Model Weights & $\sim$100 MB & $\sim$100 MB \\ \hline
+% \textbf{Total Image Size} & \textbf{8.93 GB} & \textbf{$~250$ MB} \\ \hline
+% \end{tabular}
+% \caption{Comparison of Docker Image Sizes}
+% \end{table}
 
-This \textbf{99.03\% reduction} in image size results in:
-\begin{itemize}
-    \item Faster deployment and rollback times.
-    \item Significantly lower network bandwidth usage.
-    \item Efficient storage utilization on the Docker VM.
-\end{itemize}
+% This \textbf{99.03\% reduction} in image size results in:
+% \begin{itemize}
+%     \item Faster deployment and rollback times.
+%     \item Significantly lower network bandwidth usage.
+%     \item Efficient storage utilization on the Docker VM.
+% \end{itemize}
 
 \section{Hybrid Inference Architecture with NFS and Docker}
 
@@ -341,6 +588,65 @@ This machine acts as the \textbf{compute frontend} that serves the API.
 \caption{Distinction between Library VM and Docker VM}
 \end{table}
 
-\section{Python Inference Code}
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size & 4.02 GB & $\sim$1 GB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
 
 \end{document}

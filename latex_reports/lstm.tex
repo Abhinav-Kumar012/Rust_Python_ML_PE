@@ -6,6 +6,8 @@
 \usepackage{minted}
 \usepackage{geometry}
 \geometry{a4paper, margin=1in}
+\usepackage{pdfpages}
+
 
 \title{\textbf{Comparative Analysis of LSTM Implementation: Rust (Burn) vs. PyTorch}}
 \author{Technical Report}
@@ -55,6 +57,47 @@ Both implementations adhere strictly to the following architectural design:
 \end{enumerate}
 
 
+\section{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{RustLocust/LSTM.pdf}
+
+
+
+\section{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\includepdf[pages=-]{PythonLocust/LSTM.pdf}
+
 \section{Training Pipeline}
 The training behavior is intentionally synchronized to ensure parity between the languages:
 \begin{itemize}
@@ -75,7 +118,7 @@ A critical requirement for modern PyTorch inference deployments is resolving the
     \begin{verbatim}
     -e PYTHONPATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/.../site-packages"
     \end{verbatim}
-    \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively.
+    \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively. 
 \end{enumerate}
 
 \subsection{Rust Inference Architecture}
@@ -100,5 +143,184 @@ Rust's inference pipeline diverges significantly regarding deployment complexity
     \item \textbf{No-Mutation Logic:} State mutations generated sequentially in LSTMs are represented safely utilizing explicit tuple destructuring via \texttt{LstmState\{hidden, cell\}}, bypassing complex internal pointer tracking.
     \item \textbf{Explicit Initialization Handling:} Since Burn limits orthogonal initializes out-of-the-box, Xavier Normalization was invoked explicitly, paired with \texttt{slice\_assign} tensor mappings to safely load the 1.0 uniform fill into the forget-gate components. 
 \end{itemize}
+
+\section{Rust: Training Loss Progression and Model Convergence}
+
+The model was trained for a total of 30 epochs. During training, both the training loss and validation loss decreased substantially, indicating that the model was able to learn meaningful patterns from the data.
+
+\subsection{Training Progress}
+
+The training process began with relatively high loss values. However, as training progressed, both the average training loss and average validation loss consistently decreased.
+
+The recorded loss values at different stages of training are shown below:
+
+\begin{table}[h]
+\centering
+\caption{Training and Validation Loss Progression}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Epoch} & \textbf{Average Training Loss} & \textbf{Average Validation Loss} \\
+\hline
+5  & 4456.9658 & 4473.4448 \\
+10 & 2510.1016 & 2438.3970 \\
+15 & 900.7457  & 801.6573 \\
+20 & 154.4127  & 164.8311 \\
+25 & 48.2149   & 20.1441 \\
+30 & 52.1122   & 17.5850 \\
+\hline
+\end{tabular}
+\label{tab:loss_progression}
+\end{table}
+
+\subsection{Loss Trend Analysis}
+
+The training loss decreased from 4456.9658 at epoch 5 to 52.1122 at epoch 30. Similarly, the validation loss decreased from 4473.4448 to 17.5850 over the same period.
+
+This large reduction in both training and validation loss suggests that the model successfully converged during training.
+
+Although the training loss slightly increased between epoch 25 and epoch 30, the validation loss continued to decrease. This indicates that the model continued to improve its ability to generalize to unseen data.
+
+The lowest validation loss achieved during the experiment was:
+
+\[
+17.5850
+\]
+
+at epoch 30.
+
+\subsection{Generalization Performance}
+
+The close alignment between the training loss and validation loss throughout training suggests that the model did not suffer from severe overfitting.
+
+In the earlier epochs, both losses were very high, which is expected because the model parameters were still being optimized. As training continued, the losses dropped rapidly, especially between epochs 10 and 25.
+
+This behavior indicates that the model learned most of its predictive capability during the middle phase of training.
+
+\subsection{Execution Time}
+
+The complete training process required:
+
+\begin{itemize}
+    \item Real time: 6 minutes and 42.185 seconds
+    \item User CPU time: 6 minutes and 42.414 seconds
+    \item System CPU time: 3.49 seconds
+\end{itemize}
+
+The relatively low system CPU time compared to user CPU time suggests that most of the runtime was spent performing model computation rather than operating system overhead.
+\section{Python: LSTM Model Architecture and Training Performance}
+
+The Long Short-Term Memory (LSTM) model consists of a 2-layer bidirectional LSTM followed by a fully connected output layer. Dropout is applied between LSTM layers to improve generalization.
+
+\textbf{Model Architecture:}
+
+
+The model was trained for 30 epochs. Training and validation performance improved significantly and consistently.
+
+Training loss decreased from 5543.18 to 56.11 (98.99\% reduction), while validation loss decreased from 5699.26 to 48.92. 
+The model achieved strong regression performance, with validation RMSE reaching 6.99 and MAE reaching 4.33.
+
+The $R^2$ score improved from negative values to 0.9517, indicating strong predictive capability.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min} & \textbf{Epoch} & \textbf{Max} & \textbf{Epoch} \\
+\hline
+
+Train & Loss & 56.11 & 30 & 5543.18 & 1 \\
+Train & RMSE & 7.49 & 30 & 74.45 & 1 \\
+Train & MAE & 5.03 & 30 & 67.25 & 1 \\
+Train & R$^2$ & -4.41 & 1 & 0.9452 & 30 \\
+Train & Grad Norm (Total) & 524.61 & 1 & 4972.41 & 24 \\
+Train & Iteration Speed (it/s) & 5.02 & 29 & 6.94 & 4 \\
+Train & CPU Memory (GB) & 0.87 & -- & 1.13 & -- \\
+Train & CPU Usage (\%) & 72.4 & -- & 88.8 & -- \\
+\hline
+
+Valid & Loss & 47.96 & 29 & 5699.26 & 1 \\
+Valid & RMSE & 6.93 & 29 & 75.49 & 1 \\
+Valid & MAE & 3.54 & 28 & 68.51 & 1 \\
+Valid & R$^2$ & -4.63 & 1 & 0.9526 & 29 \\
+Valid & Iteration Speed (it/s) & 5.02 & 29 & 6.94 & 4 \\
+Valid & CPU Memory (GB) & 0.87 & -- & 1.13 & -- \\
+Valid & CPU Usage (\%) & 72.4 & -- & 88.8 & -- \\
+\hline
+
+\end{tabular}
+\caption{Extended LSTM Training and Validation Metrics Summary}
+\end{table}
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 158.63 seconds
+    \item Average Epoch Time: 5.18 seconds
+    \item Iteration Speed (Mean): 6.22 it/s
+    \item Gradient Norm (Mean): 1394.59
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+
+
+
+\newpage
+
+\section{Container Comparison: Python vs Rust}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size &  3.98GB &  974MB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\section{Model Size Comparison}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
 
 \end{document}
