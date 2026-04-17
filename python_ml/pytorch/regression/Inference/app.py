@@ -11,7 +11,10 @@ from torch import nn
 # Constants (must match training)
 # ==========================================================
 
-NUM_FEATURES = 13
+NUM_FEATURES = 8
+
+FEATURES_MIN = torch.tensor([0.4999, 1., 0.8461, 0.375, 3., 0.6923, 32.54, -124.35], dtype=torch.float32)
+FEATURES_MAX = torch.tensor([15., 52., 141.9091, 34.0667, 35682., 1243.3333, 41.95, -114.31], dtype=torch.float32)
 
 GENERATED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated")
 
@@ -81,12 +84,13 @@ class HousingFeatures(BaseModel):
 
 def preprocess(features):
 
-    x = np.array(features, dtype=np.float32)
+    x = torch.tensor(features, dtype=torch.float32)
 
     if len(x) != NUM_FEATURES:
         raise ValueError(f"Expected {NUM_FEATURES} features")
 
-    x = torch.tensor(x).unsqueeze(0)
+    x = x.unsqueeze(0)
+    x = (x - FEATURES_MIN) / (FEATURES_MAX - FEATURES_MIN)
 
     return x
 

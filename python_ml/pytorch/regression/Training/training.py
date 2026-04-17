@@ -3,10 +3,10 @@ import json
 import shutil
 import time
 import random
-import urllib.request
 import psutil
 import torch
 import numpy as np
+from datasets import load_dataset
 from dataclasses import dataclass
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
@@ -15,49 +15,12 @@ from torch.utils.data import Dataset, DataLoader
 # Constants
 # ==========================================================
 
-NUM_FEATURES = 13
+NUM_FEATURES = 8
 
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated")
 
-DATASET_URL = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/boston_housing.npz"
-RAW_DATA_FILE = os.path.join(OUTPUT_DIR, "boston_housing.npz")
-
-TRAIN_FILE = os.path.join(OUTPUT_DIR, "train_data.npz")
-VALID_FILE = os.path.join(OUTPUT_DIR, "valid_data.npz")
-
-
-# ==========================================================
-# Dataset preparation
-# ==========================================================
-
-def prepare_dataset():
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    if not os.path.exists(RAW_DATA_FILE):
-        print("Downloading Boston Housing dataset...")
-        urllib.request.urlretrieve(DATASET_URL, RAW_DATA_FILE)
-        print("Download complete.")
-
-    if not os.path.exists(TRAIN_FILE) or not os.path.exists(VALID_FILE):
-
-        data = np.load(RAW_DATA_FILE)
-
-        X = data["x"]
-        y = data["y"]
-
-        split = int(0.8 * len(X))
-
-        X_train = X[:split]
-        y_train = y[:split]
-
-        X_valid = X[split:]
-        y_valid = y[split:]
-
-        np.savez(TRAIN_FILE, x=X_train, y=y_train)
-        np.savez(VALID_FILE, x=X_valid, y=y_valid)
-
-        print("Dataset prepared.")
+FEATURES_MIN = torch.tensor([0.4999, 1., 0.8461, 0.375, 3., 0.6923, 32.54, -124.35], dtype=torch.float32)
+FEATURES_MAX = torch.tensor([15., 52., 141.9091, 34.0667, 35682., 1243.3333, 41.95, -114.31], dtype=torch.float32)
 
 
 # ==========================================================
@@ -66,9 +29,28 @@ def prepare_dataset():
 
 class HousingDataset(Dataset):
 
-    def __init__(self, inputs, targets):
-        self.inputs = torch.tensor(inputs, dtype=torch.float32)
+    def __init__(self, split="train"):
+        hf_dataset = load_dataset("gvlassis/california_housing", split=split)
+        
+        # Extract features in the correct order:
+        # MedInc, HouseAge, AveRooms, AveBedrms, Population, AveOccup, Latitude, Longitude
+        features = [
+            hf_dataset["MedInc"],
+            hf_dataset["HouseAge"],
+            hf_dataset["AveRooms"],
+            hf_dataset["AveBedrms"],
+            hf_dataset["Population"],
+            hf_dataset["AveOccup"],
+            hf_dataset["Latitude"],
+            hf_dataset["Longitude"]
+        ]
+        
+        targets = hf_dataset["MedHouseVal"]
+        
+        inputs = torch.tensor(features, dtype=torch.float32).T
         self.targets = torch.tensor(targets, dtype=torch.float32)
+        
+        self.inputs = (inputs - FEATURES_MIN) / (FEATURES_MAX - FEATURES_MIN)
 
     def __len__(self):
         return len(self.inputs)
@@ -78,21 +60,11 @@ class HousingDataset(Dataset):
 
     @staticmethod
     def train():
-
-        prepare_dataset()
-
-        data = np.load(TRAIN_FILE)
-
-        return HousingDataset(data["x"], data["y"])
+        return HousingDataset("train")
 
     @staticmethod
     def validation():
-
-        prepare_dataset()
-
-        data = np.load(VALID_FILE)
-
-        return HousingDataset(data["x"], data["y"])
+        return HousingDataset("validation")
 
 
 # ==========================================================
