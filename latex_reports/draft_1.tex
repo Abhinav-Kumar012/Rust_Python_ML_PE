@@ -1,32 +1,98 @@
-\documentclass[10pt,a4paper,twocolumn]{article}
+\documentclass{ieeeaccess}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{textcomp}
 
-\usepackage{geometry}
-\geometry{margin=0.75in, columnsep=0.25in}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
-\usepackage{amsmath,amssymb}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{hyperref}
-\usepackage{enumitem}
-\usepackage{array}
+% Encoding and fonts 
+\usepackage[T1]{fontenc} 
+\usepackage[utf8]{inputenc}
+\usepackage{pdfpages} 
+
+% Math and graphics 
+\usepackage{graphicx} 
+\usepackage{booktabs} 
+\usepackage{array} 
 \usepackage{float}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{pdfpages}
-\usepackage{minted}
 
+% URLs (robust line breaking) 
+\usepackage{url} 
+\usepackage[hidelinks]{hyperref} 
+\def\UrlBreaks{\do/\do-\do_}
+
+% Code listings (stable for IEEE) 
+\usepackage{listings} 
+\usepackage{xcolor} 
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=false,   % <-- IMPORTANT (change this)
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false
+}
+
+% Custom Dockerfile language 
 \lstdefinelanguage{Dockerfile}{
   keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
   sensitive=true,
   comment=[l]{\#},
-  morestring=[b]",
+  morestring=[b]"
 }
 
-\title{\textbf{System-Level Evaluation of Rust and Python for Machine Learning}}
-\author{Project Elective}
-\date{\today}
-
 \begin{document}
+\history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
+\doi{10.1109/ACCESS.2017.DOI}
+
+\title{System-Level Evaluation of Rust and Python for Machine Learning}
+\author{\uppercase{Project Elective}\authorrefmark{1},
+\IEEEmembership{Member, IEEE}}
+\address[1]{Project Elective (e-mail: project@elective.com)}
+\tfootnote{This paragraph of the first footnote will contain support 
+information, including sponsor and financial support acknowledgment. For 
+example, ``This work was supported in part by the U.S. Department of 
+Commerce under Grant BS123456.''}
+
+\markboth
+{Project Elective \headeretal: System-Level Evaluation of Rust and Python for Machine Learning}
+{Project Elective \headeretal: System-Level Evaluation of Rust and Python for Machine Learning}
+
+\corresp{Corresponding author: Project Elective (e-mail: project@elective.com).}
+
+\begin{abstract}
+These instructions give you guidelines for preparing papers for 
+IEEE Access. Use this document as a template if you are 
+using \LaTeX. Otherwise, use this document as an 
+instruction set. The electronic file of your paper will be formatted further 
+at IEEE. Paper titles should be written in uppercase and lowercase letters, 
+not all uppercase. Avoid writing long formulas with subscripts in the title; 
+short formulas that identify the elements are fine (e.g., "Nd--Fe--B"). Do 
+not write ``(Invited)'' in the title. Full names of authors are preferred in 
+the author field, but are not required. Put a space between authors' 
+initials. The abstract must be a concise yet comprehensive reflection of 
+what is in your article. In particular, the abstract must be self-contained, 
+without abbreviations, footnotes, or references. It should be a microcosm of 
+the full article. The abstract must be between 150--250 words. Be sure that 
+you adhere to these limits; otherwise, you will need to edit your abstract 
+accordingly. The abstract must be written as one paragraph, and should not 
+contain displayed mathematical equations or tabular material. The abstract 
+should include three or four different keywords or phrases, as this will 
+help readers to find it. It is important to avoid over-repetition of such 
+phrases as this can result in a page being rejected by search engines. 
+Ensure that your abstract reads well and is grammatically correct.
+\end{abstract}
+
+\begin{keywords}
+Enter key words or phrases in alphabetical 
+order, separated by commas. For a list of suggested keywords, send a blank 
+e-mail to keywords@ieee.org or visit \underline
+{http://www.ieee.org/organizations/pubs/ani\_prod/keywrd98.txt}
+\end{keywords}
+
+\titlepgskip=-15pt
 
 \maketitle
 \section{Overview of the Project}
@@ -43,7 +109,7 @@ Rather than focusing on state-of-the-art model performance, the emphasis is on:
 
 To ensure clarity and rigor, the work is organized into \textbf{two clearly separated experimental tracks}.
 
----
+\hrule
 
 \section{Project Structure: Two-Track Evaluation}
 
@@ -65,11 +131,9 @@ This track compares \textbf{production-style inference services} implemented in:
     \item Rust-based ONNX inference.
 \end{itemize}
 
-The focus is on deployment, security, containerization, CI/CD behavior, and runtime efficiency.
+The focus is on deployment, security, containerization, CI/CD behavior, and runtime efficiency. 
 
 Each track is designed to answer a distinct research question while remaining complementary.
-
----
 
 \section{Machine Learning Tasks Considered}
 
@@ -87,7 +151,7 @@ To ensure coverage of diverse ML workloads, the following tasks are identified:
 At the current stage, the \textbf{MNIST image classification task has been fully implemented}.  
 The corresponding training code is available in the project GitHub repository.
 
----
+\hrule
 
 \section{Related Work}
 
@@ -100,7 +164,7 @@ The following research papers are being used to guide experimental design and ev
     \item \url{https://www.ijsred.com/volume8/issue2/IJSRED-V8I2P143.pdf}
 \end{itemize}
 
----
+\hrule
 
 \section{Code Repository and Current Status}
 
@@ -116,7 +180,7 @@ Current progress includes:
     \item Initial Rust (Burn) training setup completed
 \end{itemize}
 
----
+\hrule
 
 \section{Track 1: Training-Based Systems Evaluation}
 
@@ -130,9 +194,9 @@ The objective of this track is to answer the following research question:
 
 This track explicitly avoids speed-centric benchmarking and instead focuses on system behavior.
 
----
+\hrule
 
-\subsection{Frameworks Compared}
+\subsection{Frameworks Compared} 
 
 \subsubsection{PyTorch (Baseline)}
 \begin{itemize}
@@ -148,7 +212,7 @@ This track explicitly avoids speed-centric benchmarking and instead focuses on s
     \item Design: Idiomatic Rust, native training support
 \end{itemize}
 
----
+\hrule
 
 \subsection{Experimental Controls}
 
@@ -169,7 +233,7 @@ This track explicitly avoids speed-centric benchmarking and instead focuses on s
     \item Memory management
 \end{itemize}
 
----
+\hrule
 
 \subsection{Metrics Collected}
 
@@ -182,7 +246,7 @@ This track explicitly avoids speed-centric benchmarking and instead focuses on s
     \item Dependency footprint and artifact size
 \end{itemize}
 
----
+\hrule
 
 \section{Track 2: Inference-Based DevOps Evaluation}
 
@@ -190,7 +254,7 @@ This track explicitly avoids speed-centric benchmarking and instead focuses on s
 
 The objective of this track is to compare \textbf{deployment, security, and operational characteristics} of Python-based and Rust-based ML inference services executing the same ONNX model.
 
----
+\hrule
 
 \subsection{Inference Services Compared}
 
@@ -208,7 +272,7 @@ The objective of this track is to compare \textbf{deployment, security, and oper
 
 Both services expose identical inference endpoints and return identical outputs.
 
----
+\hrule
 
 \subsection{Evaluation Dimensions}
 
@@ -221,7 +285,7 @@ Both services expose identical inference endpoints and return identical outputs.
     \item Security and supply-chain surface
 \end{itemize}
 
----
+\hrule
 
 \section{Upcoming Work}
 
@@ -398,23 +462,23 @@ The builder stage is responsible for compiling the Rust application, while the r
 
 The first stage begins with:
 
-\begin{verbatim}
+\begin{lstlisting}
 FROM ubuntu:16.04 AS builder
-\end{verbatim}
+\end{lstlisting}
 
 This instruction uses Ubuntu 16.04 as the base image for building the Rust application. The alias \texttt{builder} is assigned to this stage so that its outputs can later be referenced in the runtime stage.
 
 \paragraph{Working Directory}
 
-\begin{verbatim}
+\begin{lstlisting}
 WORKDIR /app/rust_ml
-\end{verbatim}
+\end{lstlisting}
 
 The \texttt{WORKDIR} instruction sets the default working directory inside the container to:
 
-\begin{verbatim}
+\begin{lstlisting}
 /app/rust_ml
-\end{verbatim}
+\end{lstlisting}
 
 All subsequent commands in the builder stage are executed relative to this directory.
 
@@ -422,14 +486,14 @@ All subsequent commands in the builder stage are executed relative to this direc
 
 The following command installs the required packages for compiling the Rust project:
 
-\begin{verbatim}
+\begin{lstlisting}
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
     pkg-config \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
-\end{verbatim}
+\end{lstlisting}
 
 Each package serves a specific purpose:
 
@@ -442,9 +506,9 @@ Each package serves a specific purpose:
 
 The final cleanup command:
 
-\begin{verbatim}
+\begin{lstlisting}
 rm -rf /var/lib/apt/lists/*
-\end{verbatim}
+\end{lstlisting}
 
 removes cached package lists to reduce image size.
 
@@ -452,9 +516,9 @@ removes cached package lists to reduce image size.
 
 Rust is installed using the official Rust installer:
 
-\begin{verbatim}
+\begin{lstlisting}
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-\end{verbatim}
+\end{lstlisting}
 
 This command downloads and executes the \texttt{rustup} installer.
 
@@ -469,25 +533,25 @@ The flags used have the following meanings:
 
 After Rust is installed, the PATH environment variable is updated:
 
-\begin{verbatim}
+\begin{lstlisting}
 ENV PATH="/root/.cargo/bin:${PATH}"
-\end{verbatim}
+\end{lstlisting}
 
 This ensures that Rust tools such as \texttt{cargo} and \texttt{rustc} are available in subsequent commands.
 
 \paragraph{Copying Source Code}
 
-\begin{verbatim}
+\begin{lstlisting}
 COPY . .
-\end{verbatim}
+\end{lstlisting}
 
 This instruction copies the entire project directory from the host system into the current working directory inside the container.
 
 \paragraph{Building the Application}
 
-\begin{verbatim}
+\begin{lstlisting}
 RUN cargo build --release -p mnist_infer
-\end{verbatim}
+\end{lstlisting}
 
 This command compiles the Rust project in release mode.
 
@@ -500,17 +564,17 @@ The options used are:
 
 The generated executable is stored in:
 
-\begin{verbatim}
+\begin{lstlisting}
 /app/rust_ml/target/release/mnist_infer
-\end{verbatim}
+\end{lstlisting}
 
 \subsubsection{Runtime Stage}
 
 The second stage begins with:
 
-\begin{verbatim}
+\begin{lstlisting}
 FROM nvidia/vulkan:1.3-470
-\end{verbatim}
+\end{lstlisting}
 
 This stage uses an NVIDIA Vulkan runtime image as the base image. The purpose of using this image is to provide Vulkan-related runtime libraries and GPU compatibility for applications that may rely on Vulkan acceleration.
 
@@ -519,23 +583,23 @@ Compared to the builder image, this runtime image is significantly smaller becau
 
 \paragraph{Runtime Working Directory}
 
-\begin{verbatim}
+\begin{lstlisting}
 WORKDIR /app
-\end{verbatim}
+\end{lstlisting}
 
 This sets the runtime working directory to:
 
-\begin{verbatim}
+\begin{lstlisting}
 /app
-\end{verbatim}
+\end{lstlisting}
 
 All runtime files are placed relative to this location.
 
 \paragraph{Copying the Compiled Binary}
 
-\begin{verbatim}
+\begin{lstlisting}
 COPY --from=builder /app/rust_ml/target/release/mnist_infer /app/binary
-\end{verbatim}
+\end{lstlisting}
 
 This instruction copies the compiled executable from the builder stage into the runtime image.
 
@@ -543,31 +607,31 @@ The \texttt{--from=builder} option tells Docker to retrieve the file from the st
 
 The binary is renamed from:
 
-\begin{verbatim}
+\begin{lstlisting}
 mnist_infer
-\end{verbatim}
+\end{lstlisting}
 
 to:
 
-\begin{verbatim}
+\begin{lstlisting}
 /app/binary
-\end{verbatim}
+\end{lstlisting}
 
 inside the runtime container.
 
 \paragraph{Copying the Model File}
 
-\begin{verbatim}
+\begin{lstlisting}
 COPY ./model/mnist_rust/model.mpk /app/model/mnist_rust/model.mpk
-\end{verbatim}
+\end{lstlisting}
 
 This instruction copies the trained model file into the runtime container.
 
 The model file is stored at:
 
-\begin{verbatim}
+\begin{lstlisting}
 /app/model/mnist_rust/model.mpk
-\end{verbatim}
+\end{lstlisting}
 
 The application can later load this file during inference.
 
@@ -575,10 +639,10 @@ The application can later load this file during inference.
 
 Two environment variables are defined:
 
-\begin{verbatim}
+\begin{lstlisting}
 ENV RUST_LOG=info
 ENV MODEL_PATH=/app/model/mnist_rust/model.mpk
-\end{verbatim}
+\end{lstlisting}
 
 Their purposes are:
 
@@ -591,9 +655,9 @@ Using environment variables makes the application more flexible because configur
 
 \paragraph{Exposing the Application Port}
 
-\begin{verbatim}
+\begin{lstlisting}
 EXPOSE 9050
-\end{verbatim}
+\end{lstlisting}
 
 This instruction documents that the containerized application listens on port 9050.
 
@@ -601,9 +665,9 @@ Although \texttt{EXPOSE} does not automatically publish the port to the host sys
 
 \paragraph{Container Startup Command}
 
-\begin{verbatim}
+\begin{lstlisting}
 CMD ["./binary"]
-\end{verbatim}
+\end{lstlisting}
 
 This instruction defines the default command executed when the container starts.
 
@@ -632,7 +696,12 @@ This section details the image optimization strategy implemented for the MNIST i
 
 The \texttt{Dockerfile} is kept intentionally lightweight. By excluding large dependencies like \texttt{torch} from the \texttt{pip install} command, the image size remains very small (only containing the base Python runtime and lightweight web frameworks).
 
-\begin{lstlisting}[language=Dockerfile, caption={Optimized Inference Dockerfile}, label={lst:dockerfile_inference}]
+\vspace{0.5em}
+\noindent\textbf{Listing 1: Optimized Inference Dockerfile}
+\label{lst:dockerfile_inference}
+\vspace{0.3em}
+
+\begin{lstlisting}[language=Dockerfile]
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -644,7 +713,7 @@ ENV MKL_NUM_THREADS=1
 ENV PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages
 
 WORKDIR /app
-
+ 
 # Only install lightweight app dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install fastapi==0.110.0 uvicorn==0.29.0 python-multipart==0.0.9
@@ -661,7 +730,10 @@ CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
     \item \textbf{Environment Configuration:} 
     \begin{itemize}
         \item \texttt{PYTHONDONTWRITEBYTECODE=1}: Prevents Python from writing \texttt{.pyc} files to disk.
-        \item \textbf{\texttt{PYTHONPATH}}: Crucially set to \texttt{/external-libs/ml\_env/lib/python3.12/site-packages}. This instructs the Python interpreter to look for libraries in the mounted volume directory, not just the default system paths.
+        
+        \item \textbf{\texttt{PYTHONPATH}}: Crucially set to 
+        \path{/external-libs/ml_env/lib/python3.12/site-packages}. 
+        This instructs the Python interpreter to look for libraries in the mounted volume directory, not just the default system paths.
     \end{itemize}
     \item \textbf{Minimal Dependencies:} The \texttt{pip install} command only installs \texttt{fastapi}, \texttt{uvicorn}, and \texttt{python-multipart}. Heavy ML libraries are assumed to be present in the mounted volume.
 \end{itemize}
@@ -681,7 +753,12 @@ This script runs on the host machine (or a VM node) to prepare the shared librar
 \paragraph{Runtime Execution (\texttt{run\_container.sh})}
 This script launches the Docker container with the necessary runtime configurations to access the external libraries.
 
-\begin{lstlisting}[language=Bash, caption={Container Execution Command}]
+\vspace{0.5em}
+\noindent\textbf{Listing 2: Container Execution Command}
+\label{lst:docker_run}
+\vspace{0.3em}
+
+\begin{lstlisting}[language=Bash]
 docker run -d \
   -v /mnt/ml-libs:/external-libs \
   -e PYTHONPATH=/external-libs/ml_env/lib/python3.12/site-packages \
@@ -715,7 +792,7 @@ This architecture allows for rapid deployment and updating of the application lo
 
 The convolutional neural network (CNN) model used for the experiment consisted of two convolutional layers followed by adaptive average pooling, dropout, and two fully connected layers. The complete architecture is shown below:
 
-\begin{verbatim}
+\begin{lstlisting}
 Model {
   conv1: Conv2d {ch_in: 1, ch_out: 8, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 80}
   conv2: Conv2d {ch_in: 8, ch_out: 16, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 1168}
@@ -726,7 +803,7 @@ Model {
   activation: Relu
   params: 531178
 }
-\end{verbatim}
+\end{lstlisting}
 
 The model was trained for 10 epochs. Over the course of training, both the training and validation performance improved consistently. Training accuracy increased from 81.575\% in the first epoch to 97.300\% in the final epoch, while validation accuracy improved from 92.133\% to 98.517\%.
 
@@ -775,7 +852,7 @@ The convolutional neural network (CNN) model implemented in Python mirrors the R
 
 \textbf{Model Architecture:}
 
-\begin{verbatim}
+\begin{lstlisting}
 Model {
   conv1: Conv2d {ch_in: 1, ch_out: 8, kernel_size: [3, 3], stride: [1, 1]}
   conv2: Conv2d {ch_in: 8, ch_out: 16, kernel_size: [3, 3], stride: [1, 1]}
@@ -786,7 +863,7 @@ Model {
   activation: ReLU
   total params: 531178
 }
-\end{verbatim}
+\end{lstlisting}
 
 The model was trained for 10 epochs. Training and validation performance improved consistently over time.
 
@@ -891,7 +968,6 @@ Rust-based serialized models are consistently smaller than their Python counterp
 \clearpage
 
 \section{Task: Regression}
-\newpage
 
 \subsection{Introduction}
 This document outlines the architectural, mathematical, and deployment specifics of implementing a Neural Network-based Regression model across two disparate machine learning environments: Rust (utilizing the Burn framework) and Python (utilizing PyTorch). It covers the distinct model architecture decisions, dataset handling strategies, and specialized pipeline deployment techniques leveraging Network File Systems (NFS) mapping via Docker bounds.
@@ -970,14 +1046,14 @@ The regression model used in this experiment was a simple feed-forward neural ne
 
 The architecture of the regression model is shown below:
 
-\begin{verbatim}
+\begin{lstlisting}
 RegressionModel {
   input_layer: Linear {d_input: 8, d_output: 64, bias: true, params: 576}
   output_layer: Linear {d_input: 64, d_output: 1, bias: true, params: 65}
   activation: Relu
   params: 641
 }
-\end{verbatim}
+\end{lstlisting}
 
 The model contains:
 
@@ -1035,9 +1111,9 @@ Valid & CPU Usage (\%) & 19.550 & 54 & 37.960 & 11 \\
 
 A sample prediction generated by the model is shown below:
 
-\begin{verbatim}
+\begin{lstlisting}
 Predicted 2.021734 Expected 2.158
-\end{verbatim}
+\end{lstlisting}
 
 The predicted value is reasonably close to the expected value, indicating that the model was able to approximate the target variable with acceptable accuracy.
 
@@ -1327,7 +1403,12 @@ We employ the **Adam** optimizer with the following parameters:
 \paragraph{Learning Rate Scheduling}
 A **Noam Learning Rate Scheduler** is used to stabilize training. The learning rate increases linearly during a warmup phase and then decays proportionally to the inverse square root of the step number.
 \begin{equation}
-    LR = d_{model}^{-0.5} \cdot \min(step\_num^{-0.5}, step\_num \cdot warmup\_steps^{-1.5})
+\begin{aligned}
+LR &= d_{model}^{-0.5} \cdot \min( \\
+   &\quad step\_num^{-0.5}, \\
+   &\quad step\_num \cdot warmup\_steps^{-1.5}
+)
+\end{aligned}
 \end{equation}
 \begin{itemize}
     \item \textbf{Warmup Steps}: 1000
@@ -1395,7 +1476,7 @@ The text classification model used in this experiment was based on a Transformer
 
 The architecture of the model is shown below:
 
-\begin{verbatim}
+\begin{lstlisting}
 TextClassificationModel {
   transformer: TransformerEncoder {
     d_model: 256,
@@ -1426,7 +1507,7 @@ TextClassificationModel {
   n_classes: 4
   params: 10648580
 }
-\end{verbatim}
+\end{lstlisting}
 
 The Transformer encoder used four encoder layers with eight attention heads per layer. Each layer had a model dimension of 256 and a feed-forward dimension of 1024. A dropout rate of 0.1 was used to reduce overfitting.
 
@@ -1539,9 +1620,9 @@ This section details the Python implementation of the text classification traini
     The code utilizes the Hugging Face \texttt{datasets} library to load the "ag\_news" dataset. It explicitly shuffles and subsets the data (50,000 train, 5,000 test) to match the constraints applied in the Rust implementation, ensuring a fair apples-to-apples comparison between the two languages.
     \item \textbf{Collate Function with Padding Masks:}
     A custom \texttt{collate\_fn} handles dynamic batching. It tokenizes text using the \texttt{bert-base-cased} tokenizer and generates a boolean padding mask. Note the inversion logic: PyTorch's \texttt{TransformerEncoder} expects \texttt{True} for padded positions (unlike some other implementations where 1 implies validity), requiring careful mask generation:
-    \begin{verbatim}
+    \begin{lstlisting}
     mask_pad = (encoding['attention_mask'] == 0)
-    \end{verbatim}
+    \end{lstlisting}
     \item \textbf{Training Loop:}
     The training loop is a standard PyTorch implementation using \texttt{tqdm} for progress tracking. It uses \texttt{CrossEntropyLoss} as the criterion and the \texttt{Adam} optimizer. Crucially, the scheduler step is called after every batch (not every epoch), consistent with the Noam schedule requirements.
 \end{itemize}
@@ -1553,7 +1634,7 @@ The model is a Transformer-based architecture designed for multi-class news clas
 
 \textbf{Model Architecture:}
 
-\begin{verbatim}
+\begin{lstlisting}
 Model {
   transformer_encoder: {
     d_model: 256,
@@ -1565,7 +1646,7 @@ Model {
   num_classes: 4
   total params: 10649092
 }
-\end{verbatim}
+\end{lstlisting}
 
 The model was trained for 5 epochs and showed steady convergence across all evaluation metrics.
 
@@ -1634,7 +1715,12 @@ The system comprises two primary components:
 \paragraph{1. Library Sharing via NFS}
 The Library VM exports the directory containing the Python site-packages. On the Docker VM, this directory is mounted using the \texttt{mount\_libs.sh} script.
 
-\begin{lstlisting}[language=bash, caption={Mounting the NFS Library Volume}]
+\vspace{0.5em}
+\noindent\textbf{Listing 3: Mounting the NFS Library Volume}
+\label{lst:nfs_mount}
+\vspace{0.3em}
+
+\begin{lstlisting}[language=bash]
 # Configuration from mount_libs.sh
 NFS_SERVER_IP="172.16.203.14" 
 NFS_EXPORT_PATH="/home/iiitb/Documents/textClassificationVolume"
@@ -1647,7 +1733,12 @@ sudo mount -t nfs "$NFS_SERVER_IP:$NFS_EXPORT_PATH" "$LOCAL_MOUNT_POINT"
 \paragraph{2. Lightweight Docker Image}
 The Docker image is built using \texttt{Dockerfile.cpu} and excludes heavy ML libraries. It only contains the application code, the model weights, and minimal system dependencies.
 
-\begin{lstlisting}[language=Dockerfile, caption={Dockerfile.cpu Configuration}]
+\vspace{0.5em}
+\noindent\textbf{Listing 4: Dockerfile.cpu Configuration}
+\label{lst:dockerfile_cpu}
+\vspace{0.3em}
+
+\begin{lstlisting}[language=Dockerfile]
 FROM python:3.12-slim
 
 # Point Python to the external NFS mount
@@ -1663,7 +1754,12 @@ COPY model_pytorch_text_classification/ag_news_model.pth ./model/
 \paragraph{3. Runtime Execution}
 The container is launched via \texttt{run\_inference.sh}, which mounts the NFS volume into the container at \texttt{/external-libs}.
 
-\begin{lstlisting}[language=bash, caption={Mounting the NFS Library Volume}]
+\vspace{0.5em}
+\noindent\textbf{Listing 5: GPU-Based Container Execution Command}
+\label{lst:docker_gpu_run}
+\vspace{0.3em}
+
+\begin{lstlisting}[language=bash]
 docker run --gpus all \
   -v /mnt/text-libs:/external-libs \
   -v text_model_vol:/models \
@@ -1926,9 +2022,9 @@ A critical requirement for modern PyTorch inference deployments is resolving the
     \item \textbf{External Library Mounting:} A host-level script (\texttt{mount\_libs.sh}) maps an external NAS/NFS storage partition (from \texttt{172.16.203.14}) loaded with Python environments targeting \texttt{/mnt/LSTM-libs}.
     \item \textbf{Optimized Dockerfile:} The image leverages the \texttt{nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04} base image and installs basic \texttt{python3.11} runtime headers without calling \texttt{pip install torch}. Thus, the final image size is structurally negligible compared to standard ml-images.
     \item \textbf{Runtime Binding:} The inference container bootloader scripts (\texttt{run\_container.sh}) bind these volume mounts (\texttt{-v \$NFS\_MOUNT\_POINT:/external-libs}) and crucially overrides the \texttt{PYTHONPATH} env-variable:
-    \begin{verbatim}
+    \begin{lstlisting}
     -e PYTHONPATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/.../site-packages"
-    \end{verbatim}
+    \end{lstlisting}
     \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively. 
 \end{enumerate}
 
@@ -2111,7 +2207,7 @@ The Python-based container provides flexibility and rapid experimentation using 
 
 
 \subsection{Model Size Comparison}
-
+ 
 \begin{table*}[t!]
 \centering
 \begin{tabular}{|l|c|c|}
@@ -2135,5 +2231,5 @@ Rust-based serialized models are consistently smaller than their Python counterp
 
 \clearpage
 
-
+\EOD
 \end{document}

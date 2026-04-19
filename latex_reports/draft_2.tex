@@ -1,0 +1,1297 @@
+\documentclass{ieeeaccess}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{textcomp}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% Encoding and fonts 
+\usepackage[T1]{fontenc} 
+\usepackage[utf8]{inputenc}
+\usepackage{pdfpages} 
+\usepackage{enumitem}
+\setlist{noitemsep,topsep=0pt,parsep=0pt,partopsep=0pt}
+
+% Math and graphics 
+\usepackage{graphicx} 
+\usepackage{booktabs} 
+\usepackage{array} 
+\usepackage{float}
+
+% URLs (robust line breaking) 
+\usepackage{url} 
+\usepackage[hidelinks]{hyperref} 
+\def\UrlBreaks{\do/\do-\do_}
+
+% Code listings (stable for IEEE) 
+\usepackage{listings} 
+\usepackage{xcolor} 
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    breakatwhitespace=false,   % <-- IMPORTANT (change this)
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false
+}
+
+% Custom Dockerfile language 
+\lstdefinelanguage{Dockerfile}{
+  keywords={FROM, RUN, CMD, LABEL, MAINTAINER, EXPOSE, ENV, ADD, COPY, ENTRYPOINT, VOLUME, USER, WORKDIR, ARG, ONBUILD, STOPSIGNAL, HEALTHCHECK, SHELL},
+  sensitive=true,
+  comment=[l]{\#},
+  morestring=[b]"
+}
+
+\begin{document}
+\history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
+\doi{10.1109/ACCESS.2017.DOI}
+
+\title{System-Level Evaluation of Rust and Python for Machine Learning}
+\author{\uppercase{Project Elective}\authorrefmark{1},
+\IEEEmembership{Member, IEEE}}
+\address[1]{Project Elective (e-mail: project@elective.com)}
+\tfootnote{This paragraph of the first footnote will contain support 
+information, including sponsor and financial support acknowledgment. For 
+example, ``This work was supported in part by the U.S. Department of 
+Commerce under Grant BS123456.''}
+
+\markboth
+{Project Elective \headeretal: System-Level Evaluation of Rust and Python for Machine Learning}
+{Project Elective \headeretal: System-Level Evaluation of Rust and Python for Machine Learning}
+
+\corresp{Corresponding author: Project Elective (e-mail: project@elective.com).}
+
+\begin{abstract}
+These instructions give you guidelines for preparing papers for 
+IEEE Access. Use this document as a template if you are 
+using \LaTeX. Otherwise, use this document as an 
+instruction set. The electronic file of your paper will be formatted further 
+at IEEE. Paper titles should be written in uppercase and lowercase letters, 
+not all uppercase. Avoid writing long formulas with subscripts in the title; 
+short formulas that identify the elements are fine (e.g., "Nd--Fe--B"). Do 
+not write ``(Invited)'' in the title. Full names of authors are preferred in 
+the author field, but are not required. Put a space between authors' 
+initials. The abstract must be a concise yet comprehensive reflection of 
+what is in your article. In particular, the abstract must be self-contained, 
+without abbreviations, footnotes, or references. It should be a microcosm of 
+the full article. The abstract must be between 150--250 words. Be sure that 
+you adhere to these limits; otherwise, you will need to edit your abstract 
+accordingly. The abstract must be written as one paragraph, and should not 
+contain displayed mathematical equations or tabular material. The abstract 
+should include three or four different keywords or phrases, as this will 
+help readers to find it. It is important to avoid over-repetition of such 
+phrases as this can result in a page being rejected by search engines. 
+Ensure that your abstract reads well and is grammatically correct.
+\end{abstract}
+
+\begin{keywords}
+Enter key words or phrases in alphabetical 
+order, separated by commas. For a list of suggested keywords, send a blank 
+e-mail to keywords@ieee.org or visit \underline
+{http://www.ieee.org/organizations/pubs/ani\_prod/keywrd98.txt}
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\maketitle
+\section{Overview of the Project}
+
+This project studies the use of \textbf{Rust} as an alternative systems language for machine learning workflows traditionally implemented in \textbf{Python}.  
+Rather than focusing on state-of-the-art model performance, the emphasis is on:
+
+\begin{itemize}
+    \item feasibility of end-to-end ML workflows,
+    \item system stability and reproducibility,
+    \item developer experience and DevOps complexity,
+    \item deployment and operational characteristics.
+\end{itemize}
+
+To ensure clarity and rigor, the work is organized into \textbf{two clearly separated experimental tracks}.
+
+\hrule
+
+\section{Project Structure: Two-Track Evaluation}
+
+The project consists of the following two tracks:
+
+\subsection*{Track 1: Training-Based Systems Evaluation}
+This track compares \textbf{machine learning training pipelines} implemented in:
+\begin{itemize}
+    \item PyTorch (Python), and
+    \item Burn (Rust).
+\end{itemize}
+
+The goal is to evaluate training feasibility, stability, compile-time guarantees, and DevOps impact, rather than raw training speed.
+
+\subsection*{Track 2: Inference-Based DevOps Evaluation}
+This track compares \textbf{production-style inference services} implemented in:
+\begin{itemize}
+    \item Python-based ONNX inference, and
+    \item Rust-based ONNX inference.
+\end{itemize}
+
+The focus is on deployment, security, containerization, CI/CD behavior, and runtime efficiency. 
+
+Each track is designed to answer a distinct research question while remaining complementary.
+
+\section{Machine Learning Tasks Considered}
+
+To ensure coverage of diverse ML workloads, the following tasks are identified:
+
+\begin{itemize}
+    \item \textbf{Text Classification}: Dataset to be finalized.
+    \item \textbf{Image Classification}: MNIST dataset.
+    \item \textbf{Credit Score Assignment}: Supervised classification task.
+    \item \textbf{Multi-Objective Machine Learning}: Brain Tumor dataset with a MOML formulation.
+    \item \textbf{Fine-Tuning Task}: BERT-based classification (ANLP Assignment 1), with optional LoRA / QLoRA.
+    \item \textbf{Autoregressive Decoding}: Experiments using the Burn framework.
+\end{itemize}
+
+At the current stage, the \textbf{MNIST image classification task has been fully implemented}.  
+The corresponding training code is available in the project GitHub repository.
+
+\hrule
+
+\section{Related Work}
+
+The following research papers are being used to guide experimental design and evaluation:
+
+\begin{itemize}
+    \item \url{https://ieeexplore.ieee.org/document/11126113}
+    \item \url{https://ieeexplore.ieee.org/document/11261485}
+    \item \url{https://ieeexplore.ieee.org/document/11212348}
+    \item \url{https://www.ijsred.com/volume8/issue2/IJSRED-V8I2P143.pdf}
+\end{itemize}
+
+\hrule
+
+\section{Code Repository and Current Status}
+
+Project repository:
+\begin{center}
+\url{https://github.com/Abhinav-Kumar012/Rust_Python_ML_PE.git}
+\end{center}
+
+Current progress includes:
+\begin{itemize}
+    \item MNIST training pipeline implemented
+    \item PyTorch baseline established
+    \item Initial Rust (Burn) training setup completed
+\end{itemize}
+
+\hrule
+
+\section{Track 1: Training-Based Systems Evaluation}
+
+\subsection{Objective}
+
+The objective of this track is to answer the following research question:
+
+\begin{quote}
+\textit{Can Rust realistically support end-to-end machine learning training pipelines, and what system-level trade-offs does this introduce compared to PyTorch?}
+\end{quote}
+
+This track explicitly avoids speed-centric benchmarking and instead focuses on system behavior.
+
+\hrule
+
+\subsection{Frameworks Compared} 
+
+\subsubsection{PyTorch (Baseline)}
+\begin{itemize}
+    \item Language: Python
+    \item Training maturity: Very high
+    \item Ecosystem: Extensive
+\end{itemize}
+
+\subsubsection{Rust (Burn)}
+\begin{itemize}
+    \item Language: Rust
+    \item Training maturity: Emerging
+    \item Design: Idiomatic Rust, native training support
+\end{itemize}
+
+\hrule
+
+\subsection{Experimental Controls}
+
+\textbf{Fixed Across Both Implementations}
+\begin{itemize}
+    \item Dataset splits
+    \item Number of epochs
+    \item Batch size
+    \item Optimizer type
+    \item Learning rate
+    \item Hardware
+\end{itemize}
+
+\textbf{Allowed Differences}
+\begin{itemize}
+    \item Internal kernel implementations
+    \item Graph execution model
+    \item Memory management
+\end{itemize}
+
+\hrule
+
+\subsection{Metrics Collected}
+
+\begin{itemize}
+    \item Training time per epoch (reported cautiously)
+    \item Loss curves and convergence behavior
+    \item Runtime failures and numerical stability
+    \item Reproducibility across runs
+    \item Environment setup and build complexity
+    \item Dependency footprint and artifact size
+\end{itemize}
+
+\hrule
+
+\section{Track 2: Inference-Based DevOps Evaluation}
+
+\subsection{Objective}
+
+The objective of this track is to compare \textbf{deployment, security, and operational characteristics} of Python-based and Rust-based ML inference services executing the same ONNX model.
+
+\hrule
+
+\subsection{Inference Services Compared}
+
+\textbf{Python Service}
+\begin{itemize}
+    \item FastAPI + Uvicorn
+    \item ONNX Runtime (Python)
+\end{itemize}
+
+\textbf{Rust Service}
+\begin{itemize}
+    \item Axum / Actix
+    \item burn-rs
+\end{itemize}
+
+Both services expose identical inference endpoints and return identical outputs.
+
+\hrule
+
+\subsection{Evaluation Dimensions}
+
+\begin{itemize}
+    \item CI/CD build behavior
+    \item Container image size and layering
+    \item Cold-start latency
+    \item Inference latency and throughput
+    \item Resource utilization
+    \item Security and supply-chain surface
+\end{itemize}
+
+\hrule
+
+\section{Upcoming Work}
+
+The following tasks are planned for the next phase of the project:
+s
+\begin{itemize}
+    \item Develop production-style inference services for both Python and Rust.
+    \item Write Dockerfiles for Python and Rust inference services.
+    \item Set up Jenkins-based CI pipelines for inference, including build, test, containerization, and security scanning.
+\end{itemize}
+
+\section{Task: MNIST Image Classification}
+\subsection{Architecture Details}
+
+
+
+
+\subsection{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{RustLocust/MNIST.pdf}
+\caption{Rust Backend Load Testing Dashboard for MNIST}
+\end{figure}
+
+\subsection{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{PythonLocust/MNIST.pdf}
+\caption{Python Backend Load Testing Dashboard for MNIST}
+\end{figure}
+
+\subsection{Docker Containerization Strategy}
+Both Rust and Python inference workflows leverage highly optimized container strategies. For Rust, a multi-stage Docker build compiles the application within an \texttt{ubuntu:16.04} builder and transfers the standalone binary to a minimal \texttt{nvidia/vulkan:1.3-470} runtime image. 
+
+
+
+
+The Python (PyTorch) container minimizes footprint by avoiding framework installation inside the image. Utilizing \texttt{python:3.12-slim}, it only installs \texttt{fastapi} and maps heavy ML dependencies at runtime via an external NFS volume (\texttt{PYTHONPATH} override). This reduces the image size from gigabytes to under 150MB, drastically accelerating deployments.
+
+
+\subsection{Rust: CNN Model Architecture and Training Performance}
+
+The convolutional neural network (CNN) model used for the experiment consisted of two convolutional layers followed by adaptive average pooling, dropout, and two fully connected layers. The complete architecture is shown below:
+
+\begin{lstlisting}
+Model {
+  conv1: Conv2d {ch_in: 1, ch_out: 8, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 80}
+  conv2: Conv2d {ch_in: 8, ch_out: 16, stride: [1, 1], kernel_size: [3, 3], dilation: [1, 1], groups: 1, padding: Valid, params: 1168}
+  pool: AdaptiveAvgPool2d {output_size: [8, 8]}
+  dropout: Dropout {prob: 0.5}
+  linear1: Linear {d_input: 1024, d_output: 512, bias: true, params: 524800}
+  linear2: Linear {d_input: 512, d_output: 10, bias: true, params: 5130}
+  activation: Relu
+  params: 531178
+}
+\end{lstlisting}
+
+The model was trained for 10 epochs. Over the course of training, both the training and validation performance improved consistently. Training accuracy increased from 81.575\% in the first epoch to 97.300\% in the final epoch, while validation accuracy improved from 92.133\% to 98.517\%.
+
+Similarly, the training loss decreased significantly from 0.656 to 0.087, and the validation loss reduced from 0.258 to 0.054 by the end of training. The macro F1-score also improved substantially, reaching 96.974\% for training and 98.321\% for validation.
+
+
+
+The results indicate that the model achieved strong generalization performance with minimal overfitting, as the validation accuracy remained slightly higher than the training accuracy throughout the experiment. The consistently high Top-5 accuracy values further demonstrate that the model was able to correctly identify the correct class within its top predictions.
+
+It should also be noted that the execution terminated with a segmentation fault after training completion. However, since the fault occurred after all epochs had been completed and metrics had already been recorded, it did not affect the validity of the training results. \\
+
+The time taken to train the model is 229.916s (3min 49.916s).
+
+
+
+\subsection{Python: CNN Model Architecture and Training Performance}
+
+The convolutional neural network (CNN) model implemented in Python mirrors the Rust architecture, consisting of two convolutional layers followed by adaptive average pooling, dropout regularization, and two fully connected layers.
+
+\textbf{Model Architecture:}
+
+\begin{lstlisting}
+Model {
+  conv1: Conv2d {ch_in: 1, ch_out: 8, kernel_size: [3, 3], stride: [1, 1]}
+  conv2: Conv2d {ch_in: 8, ch_out: 16, kernel_size: [3, 3], stride: [1, 1]}
+  pool: AdaptiveAvgPool2d {output_size: [8, 8]}
+  dropout: Dropout {prob: 0.5}
+  linear1: Linear {d_input: 1024, d_output: 512, params: 524800}
+  linear2: Linear {d_input: 512, d_output: 10, params: 5130}
+  activation: ReLU
+  total params: 531178
+}
+\end{lstlisting}
+
+The model was trained for 10 epochs. Training and validation performance improved consistently over time.
+
+Training accuracy increased from 82.01\% to 97.29\%, while validation accuracy improved from 92.87\% to 98.20\%. 
+Training loss decreased significantly from 0.5947 to 0.0867, and validation loss reduced from 0.2475 to 0.0579.
+
+The macro F1-score reached 0.9814, demonstrating strong classification performance. Additionally, the Top-5 accuracy achieved 99.98\%, indicating highly reliable predictions.
+
+
+
+The results indicate strong generalization performance with no signs of overfitting. Validation accuracy remained consistently high and closely followed training accuracy.
+
+Training was stable with zero NaN events observed. The total training time was 182.23 seconds, with an average epoch time of 15.05 seconds and an average iteration speed of 50.58 iterations per second.
+
+
+
+\section{Task: Regression}
+
+\subsection{Introduction}
+This document outlines the architectural, mathematical, and deployment specifics of implementing a Neural Network-based Regression model across two disparate machine learning environments: Rust (utilizing the Burn framework) and Python (utilizing PyTorch). It covers the distinct model architecture decisions, dataset handling strategies, and specialized pipeline deployment techniques leveraging Network File Systems (NFS) mapping via Docker bounds.
+
+\subsection{Model Architecture and Mathematical Formulation}
+
+\subsubsection{Mathematical Foundation}
+The core mathematical foundation deployed across both frameworks is a classical Feed-Forward Neural Network consisting of a single hidden dimension mapping inputs directly onto a continuous single-variable regression output.
+
+For a given input feature vector $X \in \mathbb{R}^N$ (where $N$ dictates the feature size depending on the target dataset), the network's forward transformation can be represented sequentially as:
+\begin{align}
+    Z_1 &= X \cdot W_1^T + b_1 \quad &\text{(Input Projection)} \\
+    A_1 &= \max(0, Z_1)        \quad &\text{(ReLU Activation)} \\
+    \hat{Y} &= A_1 \cdot W_2^T + b_2 \quad &\text{(Output Projection)}
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $W_1 \in \mathbb{R}^{H \times N}$ and $b_1 \in \mathbb{R}^H$ map the inputs onto the hidden vector space $H$.
+    \item $\max(0, \cdot)$ denotes the Non-Linear Rectified Linear Unit (ReLU) mapping algorithm.
+    \item $W_2 \in \mathbb{R}^{1 \times H}$ and $b_2 \in \mathbb{R}$ collapse the hidden abstraction onto the finalized regression scalar prediction $\hat{Y}$.
+\end{itemize}
+
+\subsubsection{Architectural Configurations}
+While the mathematical foundations are identical, implementations slightly differ based on dataset selections within the modules:
+\begin{itemize}
+    \item \textbf{PyTorch Architecture:} Configures $N=13$ input features mapping to $H=64$ hidden parameters.
+    \item \textbf{Rust (Burn) Architecture:} Configures $N=8$ input features concurrently mapping to $H=64$ hidden parameters.
+\end{itemize}
+In both configurations, standard parameter biases (`bias=True`) are included and automatically initialized.
+
+\subsection{Training Pipelines}
+
+Both codebases train the model iteratively tracking gradients via the Adam optimizer scaled against Mean Squared Error (MSE) loss logic:
+\[ \text{MSE} = \frac{1}{B} \sum_{i=1}^{B} (Y_i - \hat{Y}_i)^2 \]
+
+\subsubsection{PyTorch Context}
+\begin{itemize}
+    \item \textbf{Data Loading:} Automatically pulls the \textbf{Boston Housing} dataset array (.npz file) from an external Google API via `urllib` and manually partitions it down into an explicit $80/20$ split.
+    \item \textbf{Telemetry Metrics:} Generates explicit hardware tracking loops inside the main epoch runner. Uses the `psutil` library to compute and stream epoch `iteration\_speed`, raw RAM consumption, and `cpu\_temp` hardware sensors parallel to the loss parameters.
+\end{itemize}
+
+\subsubsection{Rust (Burn) Context}
+\begin{itemize}
+    \item \textbf{Data Loading:} Links into Huggingface's dataset registry asynchronously targeting the \textbf{California Housing} SQLized splits mapping onto memory arrays via localized `HousingDistrictItem` structs.
+    \item \textbf{Normalization Mapping:} Computes spatial min-max normalizations programmatically over inputs during training:
+    \[ X_{norm} = \frac{X - \text{min}}{\text{max} - \text{min}} \]
+    This logic restricts features within standard boundaries precluding exploding gradient derivations.
+\end{itemize}
+
+\subsection{Inference Pipeline and Docker NFS Integration}
+
+Deploying these isolated pipelines necessitates radically different execution strategies, highlighting Python's heavyweight runtime dependency bottlenecks versus Rust's compile-time optimizations.
+
+\subsubsection{PyTorch Inference Architecture}
+Standard PyTorch Docker environments routinely eclipse several gigabytes due to CUDA bindings and generic scientific computation loops. To circumvent this inside microservices, the PyTorch inference pipeline mandates a hybrid Network File System (NFS) mapping architecture:
+\begin{enumerate}
+    \item \textbf{NFS Mounting (\texttt{mount\_libs.sh}):} Installs an external `nfs-common` client locally and binds the extensive python library volume from an external dedicated storage server (`172.16.203.14`) into the host machine's `/mnt/LSTM-libs` map.
+    \item \textbf{Lightweight Container Image:} The backend \texttt{Dockerfile} avoids `pip install` commands completely, simply initializing a barebone `nvidia/cuda:12.1.1` image mapping Python $3.11$ system links. 
+    \item \textbf{Volume Inject (\texttt{run\_container.sh}):} The script initializes the container enforcing `-v` flags that sync the NFS `/mnt/LSTM-libs` directory seamlessly onto the Docker's `/external-libs`. Crucially, it overrides the system \texttt{PYTHONPATH} to target those external `site-packages` at runtime.
+    \item \textbf{Execution:} The `FastAPI` instance loads, bypasses massive disk pulls, links the models iteratively, and fields inbound `HousingFeatures` lists continuously.
+\end{enumerate}
+
+\subsubsection{Rust (Burn) Inference Architecture}
+Rust handles Docker microservices inherently via statically linked deployments:
+\begin{itemize}
+    \item \textbf{Multi-Stage Compiling:} Executes a build phase operating within an oversized `rust:1.92-alpine` chain, ejecting the resulting binary onto an isolated stripped `alpine:3.23` environment structure.
+    \item \textbf{Native Routing:} Utilizes \texttt{Axum} servers to establish the HTTP logic endpoints securely routing JSON payloads mapping to specific feature names (e.g. \texttt{median\_income}, \texttt{house\_age}).
+\end{itemize}
+
+\subsection{Rust: Regression Model Performance Analysis}
+
+The regression model used in this experiment was a simple feed-forward neural network consisting of one hidden layer followed by an output layer. The model was designed to predict the median house value based on eight input features.
+
+\subsubsection{Model Architecture}
+
+The architecture of the regression model is shown below:
+
+\begin{lstlisting}
+RegressionModel {
+  input_layer: Linear {d_input: 8, d_output: 64, bias: true, params: 576}
+  output_layer: Linear {d_input: 64, d_output: 1, bias: true, params: 65}
+  activation: Relu
+  params: 641
+}
+\end{lstlisting}
+
+The model contains:
+
+\begin{itemize}
+    \item An input layer that maps 8 input features to 64 hidden units
+    \item A ReLU activation function applied after the hidden layer
+    \item An output layer that maps the 64 hidden units to a single scalar value
+\end{itemize}
+
+The total number of trainable parameters in the model was only 641, making it a lightweight model suitable for fast training and inference.
+
+\subsubsection{Training Configuration}
+
+The model was trained for 100 epochs. A constant learning rate of:
+
+\[
+1.0 \times 10^{-3}
+\]
+
+was used throughout the entire training process.
+
+\subsubsection{Training Performance}
+
+The training loss decreased substantially over the 100 epochs. Initially, the model started with a training loss of 3.086 during the first epoch. By the final epoch, the loss had reduced to 0.414.
+
+This significant reduction in loss indicates that the model successfully learned the underlying relationship between the input features and the target variable.
+
+\subsubsection{Validation Performance}
+
+Validation loss also showed a considerable improvement during training. The validation loss decreased from 4.132 in the first epoch to a minimum of 0.635 at epoch 51.
+
+The difference between the final training loss and the minimum validation loss suggests that the model achieved good generalization performance without severe overfitting.
+
+
+
+\subsubsection{Prediction Example}
+
+A sample prediction generated by the model is shown below:
+
+\begin{lstlisting}
+Predicted 2.021734 Expected 2.158
+\end{lstlisting}
+
+The predicted value is reasonably close to the expected value, indicating that the model was able to approximate the target variable with acceptable accuracy.
+
+Since the median house value was measured in units of 100,000 dollars, the prediction corresponds to:
+
+\begin{itemize}
+    \item Predicted value: approximately 202,173 dollars
+    \item Expected value: approximately 215,800 dollars
+\end{itemize}
+
+\subsubsection{Predicted vs. Expected Distribution}
+
+The predicted-versus-expected plot suggests that the model captures the general trend in the target values, although some prediction errors remain for certain samples.
+
+Most of the predicted values appear concentrated around the central region of the distribution, indicating that the model performs better on common house value ranges than on extreme values.
+
+\subsubsection{Resource Utilization}
+
+The model required relatively little memory during execution. Training memory usage ranged from 2.125 GB to 2.325 GB, while validation memory usage ranged from 2.124 GB to 2.325 GB.
+
+CPU utilization remained moderate throughout training. Training CPU usage ranged from 19.539\% to 37.989\%, while validation CPU usage ranged from 19.550\% to 37.960\%.
+
+CPU temperature values were unavailable and therefore recorded as NaN.
+
+\subsubsection{Execution Time and Failure}
+
+The complete training and evaluation process required:
+
+\begin{itemize}
+    \item Real time: 3 minutes and 18.257 seconds
+    \item User CPU time: 4 minutes and 13.554 seconds
+    \item System CPU time: 50.340 seconds
+\end{itemize}
+
+\subsection{Language Specific Implementation Details}
+
+\subsubsection{PyTorch-Specific Paradigms}
+\begin{itemize}
+    \item \textbf{Thread Clamping:} Due to inference optimization restrictions (especially running CPU variations alongside container structures), the `app.py` enforces explicit core binding calls via `torch.set\_num\_threads(1)` and `torch.set\_num\_interop\_threads(1)` securing computational resources and restricting OS context-switching overheads.
+    \item \textbf{Matrix Array Verifications:} Manually inspects raw matrix vector mappings validating dimensions dynamically against numeric constraints: \texttt{len(x) != NUM\_FEATURES} triggering runtime panics before pipeline evaluations fail. 
+    \item \textbf{Manual Hardware Moving:} The framework is heavily littered with required `.to(device)` mapping configurations switching inputs, datasets, targets, and models manually between the host and external components.
+\end{itemize}
+
+\subsubsection{Rust (Burn)-Specific Paradigms}
+\begin{itemize}
+    \item \textbf{Generic Compile-Time Shapes:} Dimension mappings and tensor validations are fundamentally enforced inside the Rust compiler boundaries via `<B, 2>` arrays indicating batches of distinct input structures mapping to `targets: Tensor<B, 1>`. Invalid sizes fail compilation, voiding the requirement for manual PyTorch matrix validations.
+    \item \textbf{Struct Batching Protocols:} Inference doesn't evaluate primitive float arrays. Intead, the API relies on executing an overarching `HousingBatcher` which transforms specific struct domains (\texttt{HousingDistrictItem}) safely into tensor primitives while executing implicit `self.normalizer.to\_device(device)` logic silently against constants behind boundaries.
+    \item \textbf{Record Deserialization:} States are strictly detached from models via standard `.mpk` maps. They invoke explicit \texttt{NoStdTrainingRecorder::new().load()} tracking traits unbinding memory limits inherent to standard dict serialization configurations natively loaded via `RegressionModelConfig`.
+\end{itemize}
+
+\newpage
+\subsection{Python: Regression Model Architecture and Training Performance}
+
+The regression model used in this experiment is a lightweight fully connected neural network with a small number of parameters (961 total). The model is optimized using mean squared error loss.
+
+
+
+The model was trained for 100 epochs. Training loss decreased significantly from 8265.55 to 69.86 (99.15\% reduction), while validation loss decreased from 9045.34 to 55.70.
+
+Despite strong loss reduction, the model struggled to achieve good generalization. The validation $R^2$ score remained negative (-1.07), indicating that the model performs worse than a simple baseline predictor.
+
+
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 47.39 seconds
+    \item Average Epoch Time: 0.225 seconds
+    \item Iteration Speed (Mean): 10.36 it/s
+    \item Gradient Norm (Mean): 7981.31
+    \item NaN Events: 0
+    \item Convergence: Non-monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+The results indicate that while optimization was successful in reducing loss, the model lacks sufficient capacity or feature representation to generalize well. The persistently negative validation $R^2$ suggests underfitting or a mismatch between model complexity and data characteristics.
+
+
+
+
+\section{Task: Text Classification (AG News)}
+\subsection{Model Architecture and Training Strategy}
+
+The text classification system is built using the \texttt{Burn} framework in Rust, leveraging a Transformer-based architecture for feature extraction and a linear classification head. This section details the mathematical formulation of the model and the strategy employed for training.
+
+\subsubsection{Model Architecture}
+The core of the model is a Transformer Encoder, which processes a sequence of token embeddings to capture contextual relationships. The architecture consists of three primary stages: embedding, encoding, and classification.
+
+\paragraph{Embedding Layer}
+Input text is tokenized and converted into a sequence of indices $X \in \mathbb{N}^{B \times L}$, where $B$ is the batch size and $L$ is the sequence length. The model utilizes two parallel embedding layers:
+\begin{enumerate}
+    \item \textbf{Token Embedding ($E_{tok}$)}: Maps token indices to dense vectors of dimension $d_{model}$.
+    \item \textbf{Positional Embedding ($E_{pos}$)}: Maps position indices $[0, \dots, L-1]$ to dense vectors of dimension $d_{model}$ to inject sequence order information.
+\end{enumerate}
+
+The final embedding representation $E$ is obtained by averaging the token and positional embeddings:
+\begin{equation}
+    E = \frac{E_{tok}(X) + E_{pos}(\text{positions})}{2}
+\end{equation}
+
+\paragraph{Transformer Encoder}
+The embedding tensor $E$ is passed through a multi-layer Transformer Encoder. Each layer consists of a Multi-Head Self-Attention (MHSA) mechanism followed by a Position-wise Feed-Forward Network (FFN), with residual connections and layer normalization. 
+
+The configuration used in this implementation is as follows:
+\begin{itemize}
+    \item \textbf{Model Dimension ($d_{model}$)}: 256
+    \item \textbf{Feed-Forward Dimension ($d_{ff}$)}: 1024
+    \item \textbf{Number of Heads ($N_{heads}$)}: 8
+    \item \textbf{Number of Layers ($N_{layers}$)}: 4
+    \item \textbf{Normalization}: Layer norm applied before sub-layers (Pre-Norm).
+\end{itemize}
+
+Let $H = \text{TransformerEncoder}(E)$, where $H \in \mathbb{R}^{B \times L \times d_{model}}$ represents the contextualized representations of the input sequence.
+
+\paragraph{Classification Head}
+For classification, the model utilizes the representation of the first token (typically acting as the [CLS] token) from the encoded sequence. This vector is passed through a linear layer to project it into the class space:
+\begin{equation}
+    Y = \text{Linear}(H_{[:, 0, :]})
+\end{equation}
+where $Y \in \mathbb{R}^{B \times N_{classes}}$ represents the logits. For inference, a Softmax function is applied to obtain probabilities:
+\begin{equation}
+    \hat{P} = \text{Softmax}(Y)
+\end{equation}
+
+\begin{table*}[t!]
+\centering
+\caption{Model Architecture Summary}
+\label{tab:model_arch}
+\begin{tabular}{|l|l|c|c|}
+\hline
+\textbf{Component} & \textbf{Configuration / Details} & \textbf{Input Shape} & \textbf{Output Shape} \\ \hline
+Token Embedding & $V \to d_{model}$ ($V$: Vocab Size) & $(B, L)$ & $(B, L, 256)$ \\ \hline
+Pos Embedding & $L_{max} \to d_{model}$ & $(B, L)$ & $(B, L, 256)$ \\ \hline
+Embedding Merge & Average ($E_{tok} + E_{pos}$) & - & $(B, L, 256)$ \\ \hline
+Transformer Block & 4 Layers, 8 Heads, $d_{ff}=1024$ & $(B, L, 256)$ & $(B, L, 256)$ \\ \hline
+Feature Extract & Slice First Token (Index 0) & $(B, L, 256)$ & $(B, 256)$ \\ \hline
+Classifier Head & Linear ($256 \to N_{classes}$) & $(B, 256)$ & $(B, N_{classes})$ \\ \hline
+\end{tabular}
+\end{table*}
+
+
+
+\subsection{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{RustLocust/text.pdf}
+\caption{Rust Backend Load Testing Dashboard for Text Classification}
+\end{figure}
+
+\subsection{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{PythonLocust/text.pdf}
+\caption{Python Backend Load Testing Dashboard for Text Classification}
+\end{figure}
+
+\subsubsection{Training Strategy}
+The model is trained using a supervised learning approach with the following configuration:
+
+\paragraph{Loss Function}
+The training objective is to minimize the Cross-Entropy Loss between the predicted logits $Y$ and the ground truth class labels $C$:
+\begin{equation}
+    \mathcal{L} = \text{CrossEntropy}(Y, C) = -\sum_{c=1}^{N_{classes}} \mathbb{1}_{c=C} \log\left(\frac{e^{Y_c}}{\sum_{j} e^{Y_j}}\right)
+\end{equation}
+
+\paragraph{Optimization}
+We employ the **Adam** optimizer with the following parameters:
+\begin{itemize}
+    \item \textbf{Weight Decay}: $5 \times 10^{-5}$
+    \item \textbf{Beta Coefficients}: Standard defaults (typically $\beta_1=0.9, \beta_2=0.999$)
+\end{itemize}
+
+\paragraph{Learning Rate Scheduling}
+A **Noam Learning Rate Scheduler** is used to stabilize training. The learning rate increases linearly during a warmup phase and then decays proportionally to the inverse square root of the step number.
+\begin{equation}
+\begin{aligned}
+LR &= d_{model}^{-0.5} \cdot \min( \\
+   &\quad step\_num^{-0.5}, \\
+   &\quad step\_num \cdot warmup\_steps^{-1.5}
+)
+\end{aligned}
+\end{equation}
+\begin{itemize}
+    \item \textbf{Warmup Steps}: 1000
+    \item \textbf{Base Learning Rate}: 0.01
+\end{itemize}
+
+\paragraph{Metrics}
+During training and validation, the following metrics are tracked to monitor performance:
+\begin{itemize}
+    \item \textbf{Loss}: Cross-Entropy Loss.
+    \item \textbf{Accuracy}: Percentage of correct predictions.
+    \item \textbf{F1-Score, Precision, Recall}: Macro-averaged metrics to account for class balance.
+\end{itemize}
+
+\subsection{Burn Code Specifications}
+
+This section outlines the significant implementation details of the text classification system, focusing on the architectural choices in \texttt{model.rs} and the robust training pipeline defined in \texttt{training.rs}.
+\subsubsection{Model Implementation (\texttt{model.rs})}
+The \texttt{TextClassificationModel} leverages the \textbf{Burn} framework's modular design to implement a Transformer-based classifier. Key features of this implementation include:
+\begin{itemize}
+    \item \textbf{Dual Embedding Strategy:} The model employs two distinct embedding layers: \texttt{embedding\_token} for semantic content and \texttt{embedding\_pos} for positional information. A unique characteristic of this implementation is the fusion strategy, where these embeddings are combined via averaging:
+    \[
+    E_{final} = \frac{E_{pos} + E_{token}}{2}
+    \]
+    This differs from the standard summation approach often found in BERT implementations, potentially stabilizing the initial magnitude of the embedding vectors.
+    
+    \item \textbf{Configurable Architecture:} The system uses a \texttt{TextClassificationModelConfig} struct derived with the \texttt{Config} macro. This allows for type-safe and serializable hyperparameter management, ensuring the model architecture (hidden size, vocabulary size, sequence length) can be easily saved, loaded, and reproducible.
+    
+    \item \textbf{Masked Attention:} The forward pass actively utilizes padding masks (\texttt{mask\_pad}). These masks are passed into the \texttt{TransformerEncoderInput}, ensuring that the self-attention mechanism strictly ignores padding tokens, which is critical for handling variable-length text sequences correctly.
+    
+    \item \textbf{Separation of Train and Inference Logic:} The model explicitly implements the \texttt{TrainStep} and \texttt{InferenceStep} traits. 
+    \begin{itemize}
+        \item \textbf{Training:} Returns a \texttt{ClassificationOutput} struct containing the calculated Cross-Entropy loss for backpropagation.
+        \item \textbf{Inference:} Returns raw probabilities by applying a softmax activation on the output logits, facilitating direct class prediction.
+    \end{itemize}
+\end{itemize}
+\subsubsection{Training Pipeline (\texttt{training.rs})}
+The training module is designed for reliability and comprehensive observability. It integrates advanced optimization techniques and hardware-aware monitoring.
+\begin{itemize}
+    \item \textbf{Noam Scheduler:} Transformer models are notoriously sensitive to learning rates. The code implements the \textbf{Noam Learning Rate Scheduler} (popularized by "Attention Is All You Need"), which features a linear warmup phase (1000 steps) followed by an inverse square root decay based on the model dimension ($d_{model}$). This prevents gradient explosions during early training stages.
+    
+    \item \textbf{Distributed Training Support:} The implementation explicitly handles distributed computing scenarios. It utilizes Rust's feature flags (\texttt{cfg[feature = "ddp"]}) to switch between single-device training and \textbf{Distributed Data Parallel (DDP)} strategies. When enabled, it employs a tree-based \texttt{AllReduceStrategy} for synchronizing gradients across multiple GPUs or nodes.
+    
+    \item \textbf{Comprehensive Telemetry:} The training loop is instrumented with an extensive suite of metrics beyond simple accuracy. It tracks:
+    \begin{itemize}
+        \item \textbf{Classification Metrics:} Macro-averaged F1-Score, Precision, and Recall, providing a holistic view of model performance on imbalanced datasets.
+        \item \textbf{Hardware Diagnostics:} CPU temperature, memory usage, and utilization are logged alongside training progress, aiding in the detection of thermal throttling or memory leaks during long training runs.
+    \end{itemize}
+    
+    \item \textbf{Efficient Data Sampling:} To manage large datasets efficiently, the loader utilizes a \texttt{SamplerDataset}. This limits the effective epoch size to 50,000 training samples and 5,000 validation samples, allowing for rapid iteration and feedback loops without needing to process the entire corpus in every epoch.
+\end{itemize}
+
+\subsection{Rust: Transformer-Based Text Classification Model Performance}
+
+The text classification model used in this experiment was based on a Transformer encoder architecture. The model consisted of token embeddings, positional embeddings, a multi-layer Transformer encoder, and a final linear classification layer.
+
+\subsubsection{Model Architecture}
+
+The architecture of the model is shown below:
+
+\begin{lstlisting}
+TextClassificationModel {
+  transformer: TransformerEncoder {
+    d_model: 256,
+    d_ff: 1024,
+    n_heads: 8,
+    n_layers: 4,
+    dropout: 0.1,
+    norm_first: true,
+    quiet_softmax: true,
+    params: 3159040
+  }
+  embedding_token: Embedding {
+    n_embedding: 28996,
+    d_model: 256,
+    params: 7422976
+  }
+  embedding_pos: Embedding {
+    n_embedding: 256,
+    d_model: 256,
+    params: 65536
+  }
+  output: Linear {
+    d_input: 256,
+    d_output: 4,
+    bias: true,
+    params: 1028
+  }
+  n_classes: 4
+  params: 10648580
+}
+\end{lstlisting}
+
+The Transformer encoder used four encoder layers with eight attention heads per layer. Each layer had a model dimension of 256 and a feed-forward dimension of 1024. A dropout rate of 0.1 was used to reduce overfitting.
+
+The token embedding layer mapped a vocabulary of 28,996 tokens into 256-dimensional vectors. Positional embeddings of length 256 were also used so that the Transformer could capture token order information.
+
+The final output layer mapped the Transformer representation into four output classes.
+
+The total number of trainable parameters in the model was 10,648,580.
+
+\subsubsection{Training Configuration}
+
+The model was trained for a total of 5 epochs. During training, the learning rate decayed from $1.107 \times 10^{-5}$ in the first epoch to $3.733 \times 10^{-6}$ in the final epoch.
+
+\subsubsection{Training Performance}
+
+Training accuracy improved steadily from 57.968\% in the first epoch to 81.474\% in the fifth epoch. Similarly, the training loss decreased from 0.981 to 0.507.
+
+The macro precision, recall, and F1-score also improved significantly during training:
+
+\begin{itemize}
+    \item Precision increased from 58.893\% to 81.606\%
+    \item Recall increased from 57.741\% to 81.334\%
+    \item F1-score increased from 50.201\% to 76.001\%
+\end{itemize}
+
+These results indicate that the model learned meaningful semantic patterns in the text data over successive epochs.
+
+\subsubsection{Validation Performance}
+
+Validation performance also improved consistently. Validation accuracy increased from 72.280\% in the first epoch to a maximum of 81.640\% in the fourth epoch.
+
+The validation loss decreased from 0.731 to 0.507, showing that the model generalized reasonably well to unseen data.
+
+The validation precision, recall, and F1-score also showed strong improvement:
+
+\begin{itemize}
+    \item Precision increased from 72.230\% to 81.739\%
+    \item Recall increased from 72.258\% to 82.039\%
+    \item F1-score increased from 65.796\% to 76.509\%
+\end{itemize}
+
+The relatively close values between training and validation accuracy suggest that the model did not suffer from severe overfitting.
+
+\begin{table*}[t!]
+\centering
+\caption{Training and Validation Metrics Summary for the Transformer-Based Text Classification Model}
+% @kumar please layout sahi kar sakta hai? love you
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Split} & \textbf{Metric} & \textbf{Min.} & \textbf{Epoch} & \textbf{Max.} & \textbf{Epoch} \\
+\hline
+Train & Accuracy & 57.968 & 1 & 81.474 & 5 \\
+Train & Loss & 0.507 & 5 & 0.981 & 1 \\
+Train & Precision@Top1 [Macro] & 58.893 & 1 & 81.606 & 5 \\
+Train & Recall@Top1 [Macro] & 57.741 & 1 & 81.334 & 5 \\
+Train & F1-Score@Top1 [Macro] & 50.201 & 1 & 76.001 & 5 \\
+Train & Learning Rate & $3.733 \times 10^{-6}$ & 5 & $1.107 \times 10^{-5}$ & 1 \\
+Train & CPU Memory (GB) & 2.401 & 2 & 2.736 & 5 \\
+Train & CPU Usage (\%) & 16.529 & 1 & 17.160 & 5 \\
+\hline
+Valid & Accuracy & 72.280 & 1 & 81.640 & 4 \\
+Valid & Loss & 0.507 & 5 & 0.731 & 1 \\
+Valid & Precision@Top1 [Macro] & 72.230 & 1 & 81.739 & 5 \\
+Valid & Recall@Top1 [Macro] & 72.258 & 1 & 82.039 & 5 \\
+Valid & F1-Score@Top1 [Macro] & 65.796 & 1 & 76.509 & 5 \\
+Valid & CPU Memory (GB) & 2.263 & 1 & 2.747 & 5 \\
+Valid & CPU Usage (\%) & 20.331 & 1 & 22.190 & 3 \\
+\hline
+\end{tabular}
+\label{tab:transformer_text_classification_metrics}
+\end{table*}
+
+\subsubsection{Resource Utilization}
+
+The CPU memory usage remained relatively stable throughout training. Training memory usage ranged from 2.401 GB to 2.736 GB, while validation memory usage ranged from 2.263 GB to 2.747 GB.
+
+CPU utilization also remained moderate, with training CPU usage ranging from 16.529\% to 17.160\% and validation CPU usage ranging from 20.331\% to 22.190\%.
+
+CPU temperature values were unavailable during the experiment and therefore recorded as NaN.
+
+\subsubsection{Execution Time and Failure}
+
+The complete training run required:
+
+\begin{itemize}
+    \item Real time: 32 minutes and 37.872 seconds
+    \item User CPU time: 36 minutes and 52.313 seconds
+    \item System CPU time: 1 minute and 41.258 seconds
+\end{itemize}
+
+\subsection{PyTorch Training Pipeline}
+This section details the Python implementation of the text classification training pipeline. The code mimics the architecture and logic of the Rust version to ensuring comparable performance and behavior.
+\subsubsection{Code Highlights}
+\begin{itemize}
+    \item \textbf{Custom Transformer Model:}
+    The \texttt{TextClassificationModel} is a custom \texttt{nn.Module} containing:
+    \begin{itemize}
+        \item Dual embedding layers (\texttt{embedding\_token} and \texttt{embedding\_pos}).
+        \item A unique fusion strategy averaging the two embeddings: $E = (E_{pos} + E_{tok}) / 2$.
+        \item A standard \texttt{TransformerEncoder} stack.
+        \item A classification head that projects the encoded features to the 4 output classes of the AG News dataset.
+    \end{itemize}
+    \item \textbf{Noam Learning Rate Scheduler:}
+    A custom \texttt{NoamLR} scheduler is implemented to replicate the specific warmup and decay behavior used in the Rust implementation (and the original "Attention Is All You Need" paper).
+    \[
+    lr = \text{factor} \cdot (d_{model}^{-0.5}) \cdot \min(step^{-0.5}, step \cdot warmup^{-1.5})
+    \]
+    This ensures stable training dynamics for the Transformer architecture.
+    \item \textbf{Dataset Handling:}
+    The code utilizes the Hugging Face \texttt{datasets} library to load the "ag\_news" dataset. It explicitly shuffles and subsets the data (50,000 train, 5,000 test) to match the constraints applied in the Rust implementation, ensuring a fair apples-to-apples comparison between the two languages.
+    \item \textbf{Collate Function with Padding Masks:}
+    A custom \texttt{collate\_fn} handles dynamic batching. It tokenizes text using the \texttt{bert-base-cased} tokenizer and generates a boolean padding mask. Note the inversion logic: PyTorch's \texttt{TransformerEncoder} expects \texttt{True} for padded positions (unlike some other implementations where 1 implies validity), requiring careful mask generation:
+    \begin{lstlisting}
+    mask_pad = (encoding['attention_mask'] == 0)
+    \end{lstlisting}
+    \item \textbf{Training Loop:}
+    The training loop is a standard PyTorch implementation using \texttt{tqdm} for progress tracking. It uses \texttt{CrossEntropyLoss} as the criterion and the \texttt{Adam} optimizer. Crucially, the scheduler step is called after every batch (not every epoch), consistent with the Noam schedule requirements.
+\end{itemize}
+
+
+\subsection{Python: Text Classification (News) Transformer Model}
+
+The model is a Transformer-based architecture designed for multi-class news classification. It consists of a multi-layer encoder with multi-head self-attention and feedforward networks.
+
+\textbf{Model Architecture:}
+
+\begin{lstlisting}
+Model {
+  transformer_encoder: {
+    d_model: 256,
+    nhead: 8,
+    num_layers: 4,
+    dim_feedforward: 1024
+  }
+  max_seq_len: 256
+  num_classes: 4
+  total params: 10649092
+}
+\end{lstlisting}
+
+The model was trained for 5 epochs and showed steady convergence across all evaluation metrics.
+
+Training accuracy improved from 56.19\% to 79.70\%, while validation accuracy increased from 68.14\% to 79.00\%. 
+Training loss decreased from 1.0145 to 0.5483, and validation loss reduced from 0.8137 to 0.5628.
+
+The model achieved a macro F1-score of 0.7903 on the validation/test set, indicating reasonably strong classification performance for a Transformer trained over a small number of epochs.
+
+
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 706.99 seconds
+    \item Average Epoch Time: 139.83 seconds
+    \item Iteration Speed (Mean): 44.70 it/s
+    \item Gradient Norm (Mean): 15.75
+    \item GPU Memory Usage: 178.79 MB
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+The results indicate stable training and consistent improvement across epochs. While performance is lower than simpler CNN-based tasks, this is expected due to the increased complexity of natural language understanding tasks.
+
+
+\section{Task: LSTM implementation}
+
+\subsection{Introduction}
+This document outlines the detailed architectural, mathematical, and translational specifics of implementing a Long Short-Term Memory (LSTM) model across two prominent machine learning environments: Rust (using the Burn framework) and Python (using PyTorch). It covers the model architecture, training pipelines, specialized deployment techniques using network filesystems (NFS) with Docker, and language-specific design implications.
+
+\subsection{Model Architecture and Mathematical Formulation}
+
+\subsubsection{Mathematical Foundation of the LSTM Cell}
+The core of the model revolves around a custom, manually-implemented LSTM cell. Instead of relying on the standard un-inspectable black-box LSTM implementations provided by typical ML libraries, both codebases explicitly define the cell-level math. 
+
+For a given timestep $t$, the input tensor $x_t$ and the previous hidden state $h_{t-1}$ are used to compute the various gates. The mathematical formulation utilized is:
+\begin{align}
+    f_t &= \sigma(W_f \cdot [h_{t-1}, x_t] + b_f) \quad &\text{(Forget Gate)} \\
+    i_t &= \sigma(W_i \cdot [h_{t-1}, x_t] + b_i) \quad &\text{(Input Gate)} \\
+    g_t &= \tanh(W_g \cdot [h_{t-1}, x_t] + b_g) \quad &\text{(Candidate State)} \\
+    o_t &= \sigma(W_o \cdot [h_{t-1}, x_t] + b_o) \quad &\text{(Output Gate)}
+\end{align}
+\begin{align}
+    c_t &= f_t \odot c_{t-1} + i_t \odot g_t \quad &\text{(New Cell State)} \\
+    h_t &= o_t \odot \tanh(c_t) \quad &\text{(New Hidden State)}
+\end{align}
+
+Where:
+\begin{itemize}
+    \item $\sigma$ represents the Sigmoid activation function.
+    \item $\tanh$ represents the Hyperbolic Tangent activation function.
+    \item $\odot$ denotes element-wise multiplication (Hadamard product).
+    \item $[h_{t-1}, x_t]$ symbolizes the concatenation of the previous hidden state and the current input.
+\end{itemize}
+
+\subsubsection{Architectural Details}
+Both implementations adhere strictly to the following architectural design:
+\begin{enumerate}
+    \item \textbf{Layer Normalization:} Pre-activation gates, the cell state ($c_t$), and the hidden state ($h_t$) pass through separate \texttt{LayerNorm} layers. This design choice stabilizes training dynamics since the feature distributions inside the LSTM evolve at every sequence step (making standard Batch Normalization ineffective).
+    \item \textbf{Optimized Gate Compute:} Instead of computing 4 separate linear transformations per timestep for the features, the model employs a single combined projection that outputs a $4 \times \text{hidden\_size}$ tensor. This tensor is subsequently split into four chunks corresponding to the $i, f, g$, and $o$ gates.
+    \item \textbf{Bidirectional Support:} An encapsulated \texttt{StackedLstm} module stacks multiple manual LSTM layers (applying dropout between layers except on the final one). The main \texttt{LstmNetwork} integrates a forward processing stack and an optional backward processing stack (which flips the temporal dimension of the input sequence). Their respective output hidden states are concatenated along the feature dimension before passing through a fully-connected projection head.
+    \item \textbf{Initialization bias:} The forget-gate bias parameters are explicitly initialized to $1.0$ (via Xavier Normal parameter slicing) to prevent fatal early-training gradient decay.
+\end{enumerate}
+
+
+\subsection{Rust Backend: Load Testing with Locust}
+
+The performance of the Rust-based backend was evaluated using the Locust load testing framework. The objective was to analyze system behavior under concurrent user load and measure key performance characteristics such as throughput and latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Rust (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{RustLocust/LSTM.pdf}
+\caption{Rust Backend Load Testing Dashboard for LSTM}
+\end{figure}
+
+\subsection{Python Backend: Load Testing with Locust}
+
+The performance of the Python-based backend was evaluated using the Locust load testing framework. The goal was to assess system behavior under concurrent user load and analyze key performance characteristics such as throughput and response latency.
+
+\textbf{Testing Setup:}
+\begin{itemize}
+    \item Tool: Locust
+    \item Backend: Python (HTTP service)
+    \item Test Type: Concurrent user load simulation
+    \item Environment: Linux system
+\end{itemize}
+
+\textbf{Dashboard Visualization:}
+
+\textbf{Full Report:}
+
+The complete load testing dashboard has been exported as a PDF and is included below for detailed inspection.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{PythonLocust/LSTM.pdf}
+\caption{Python Backend Load Testing Dashboard for LSTM}
+\end{figure}
+
+\subsection{Training Pipeline}
+The training behavior is intentionally synchronized to ensure parity between the languages:
+\begin{itemize}
+    \item \textbf{Data Loading:} Operates synchronously on synthetically generated noisy sequential datasets. The validation set is scaled symmetrically relative to the training set ($20\%$ of training size).
+    \item \textbf{Optimization Algorithm:} Utilizes the Adam Optimizer.
+    \item \textbf{Loss Function:} Mean Squared Error (MSE), with reduction set to \textit{mean}. Both explicitly weigh loss accumulation during epoch passes by scaling local batch losses by the discrete batch size, averaging properly at the conclusion of the epoch.
+    \item \textbf{Gradient Clipping:} Ensures numerical stability on longer sequence inputs. The gradient norm is strictly clipped to $\max = 1.0$ right before the optimizer steps.
+    \item \textbf{Artifacts Output:} Training scripts generate an \texttt{artifact\_dir} where they store a \texttt{config.json} representation of hyperparameters, and the full state dictionary (\texttt{model.pt} in PyTorch; CompactRecorder files in Rust Burn).
+\end{itemize}
+
+\subsection{Inference Pipeline and Docker NFS Integration}
+\subsubsection{PyTorch Inference Architecture}
+A critical requirement for modern PyTorch inference deployments is resolving the massive disk footprint of CUDA-enabled PyTorch backend libraries. The PyTorch pipeline employs a sophisticated Network File System (NFS) logic to achieve a highly optimized, lightweight Dockerized inference deployment:
+\begin{enumerate}
+    \item \textbf{External Library Mounting:} A host-level script (\texttt{mount\_libs.sh}) maps an external NAS/NFS storage partition (from \texttt{172.16.203.14}) loaded with Python environments targeting \texttt{/mnt/LSTM-libs}.
+    \item \textbf{Optimized Dockerfile:} The image leverages the \texttt{nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04} base image and installs basic \texttt{python3.11} runtime headers without calling \texttt{pip install torch}. Thus, the final image size is structurally negligible compared to standard ml-images.
+    \item \textbf{Runtime Binding:} The inference container bootloader scripts (\texttt{run\_container.sh}) bind these volume mounts (\texttt{-v \$NFS\_MOUNT\_POINT:/external-libs}) and crucially overrides the \texttt{PYTHONPATH} env-variable:
+    \begin{lstlisting}
+    -e PYTHONPATH="$CONTAINER_LIB_MOUNT/LSTM_env/lib/.../site-packages"
+    \end{lstlisting}
+    \item \textbf{Inference Execution:} \texttt{app.py} loads the model weights off an abstracted configuration path, builds a zero-gradient loader, runs inference iteratively over a single collapsed batch, and yields predictions natively. 
+\end{enumerate}
+
+\subsubsection{Rust Inference Architecture}
+Rust's inference pipeline diverges significantly regarding deployment complexity due to compilation structures:
+\begin{itemize}
+    \item \textbf{Stateless Binaries:} No containerized runtime libraries are mandated because Burn compiles statically down to heavily optimized binaries, pulling model states directly via the \texttt{CompactRecorder}.
+    \item \textbf{Visualization:} Results are mapped into native Polars \texttt{DataFrame} objects (\texttt{df![]}) rendering lightweight native tables detailing \textit{expected targets} versus \textit{computed predictions}.
+\end{itemize}
+
+\subsection{Implementation Specifics}
+\subsubsection{PyTorch Specific Constraints}
+\begin{itemize}
+    \item \textbf{Dynamic computation graphing:} The \texttt{model.py} cleanly slices and chunks gates natively on tensors (e.g., \texttt{gates.chunk(4, dim=1)}).
+    \item \textbf{Sequence Reversals:} Done programmatically via continuous \texttt{Tensor.flip(dims=[1])} which mandates that tensors must remain contiguously stored within PyTorch internals to avoid memory reallocation overhead.
+    \item \textbf{Seed Setting API:} Requires deterministic locking across four sub-systems (\texttt{random, numpy, torch, torch.cuda}) to match Rust's reproducibility parameters.
+\end{itemize}
+
+\subsubsection{Rust (Burn) Specific Constraints}
+\begin{itemize}
+    \item \textbf{Compile-Time Dimension Types:} Rust explicitly binds Tensor dimensionality at compile time (\texttt{Tensor<B, 3>} vs \texttt{Tensor<B, 2>}). This offers un-matched safety by forbidding invalid dimension injections that PyTorch would crash on dynamically.
+    \item \textbf{Trait Encapsulation:} Leverages explicit trait architectures (\texttt{\#[derive(Module, Config)]}) that automate saving hyperparameters and generating gradient backends. Burn models must be mapped cleanly from standard states to \texttt{autodiff} states.
+    \item \textbf{No-Mutation Logic:} State mutations generated sequentially in LSTMs are represented safely utilizing explicit tuple destructuring via \texttt{LstmState\{hidden, cell\}}, bypassing complex internal pointer tracking.
+    \item \textbf{Explicit Initialization Handling:} Since Burn limits orthogonal initializes out-of-the-box, Xavier Normalization was invoked explicitly, paired with \texttt{slice\_assign} tensor mappings to safely load the 1.0 uniform fill into the forget-gate components. 
+\end{itemize}
+
+\subsection{Rust: Training Loss Progression and Model Convergence}
+
+The model was trained for a total of 30 epochs. During training, both the training loss and validation loss decreased substantially, indicating that the model was able to learn meaningful patterns from the data.
+
+\subsubsection{Training Progress}
+
+The training process began with relatively high loss values. However, as training progressed, both the average training loss and average validation loss consistently decreased.
+
+The recorded loss values at different stages of training are shown below:
+
+
+
+\subsubsection{Loss Trend Analysis}
+
+The training loss decreased from 4456.9658 at epoch 5 to 52.1122 at epoch 30. Similarly, the validation loss decreased from 4473.4448 to 17.5850 over the same period.
+
+This large reduction in both training and validation loss suggests that the model successfully converged during training.
+
+Although the training loss slightly increased between epoch 25 and epoch 30, the validation loss continued to decrease. This indicates that the model continued to improve its ability to generalize to unseen data.
+
+The lowest validation loss achieved during the experiment was:
+
+\[
+17.5850
+\]
+
+at epoch 30.
+
+\subsubsection{Generalization Performance}
+
+The close alignment between the training loss and validation loss throughout training suggests that the model did not suffer from severe overfitting.
+
+In the earlier epochs, both losses were very high, which is expected because the model parameters were still being optimized. As training continued, the losses dropped rapidly, especially between epochs 10 and 25.
+
+This behavior indicates that the model learned most of its predictive capability during the middle phase of training.
+
+\subsubsection{Execution Time}
+
+The complete training process required:
+
+\begin{itemize}
+    \item Real time: 6 minutes and 42.185 seconds
+    \item User CPU time: 6 minutes and 42.414 seconds
+    \item System CPU time: 3.49 seconds
+\end{itemize}
+
+The relatively low system CPU time compared to user CPU time suggests that most of the runtime was spent performing model computation rather than operating system overhead.
+\subsection{Python: LSTM Model Architecture and Training Performance}
+
+The Long Short-Term Memory (LSTM) model consists of a 2-layer bidirectional LSTM followed by a fully connected output layer. Dropout is applied between LSTM layers to improve generalization.
+
+\textbf{Model Architecture:}
+
+
+The model was trained for 30 epochs. Training and validation performance improved significantly and consistently.
+
+Training loss decreased from 5543.18 to 56.11 (98.99\% reduction), while validation loss decreased from 5699.26 to 48.92. 
+The model achieved strong regression performance, with validation RMSE reaching 6.99 and MAE reaching 4.33.
+
+The $R^2$ score improved from negative values to 0.9517, indicating strong predictive capability.
+
+
+
+\textbf{Training Efficiency and Stability:}
+\begin{itemize}
+    \item Total Training Time: 158.63 seconds
+    \item Average Epoch Time: 5.18 seconds
+    \item Iteration Speed (Mean): 6.22 it/s
+    \item Gradient Norm (Mean): 1394.59
+    \item NaN Events: 0
+    \item Convergence: Monotonic loss decrease
+    \item Overfitting Detected: No
+\end{itemize}
+
+
+
+
+\section{Overall Evaluation Summary}
+
+\subsection{Container Comparison: Python vs Rust}
+
+\begin{table*}[t!]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Feature} & \textbf{Python (GPU)} & \textbf{Rust (WGPU)} \\
+\hline
+Image Name & text\_classification\_image & text\_class\_rs \\
+\hline
+Size &  3.98GB &  974MB \\
+\hline
+Backend & PyTorch + CUDA & Native Rust (WGPU) \\
+\hline
+Startup Time & Slower & Faster \\
+\hline
+Dependencies & Heavy (Torch, CUDA, Python) & Minimal (compiled binary) \\
+\hline
+Deployment Complexity & Higher & Lower \\
+\hline
+Flexibility & High (research-friendly) & Moderate \\
+\hline
+Runtime Stability & Medium & High \\
+\hline
+\end{tabular}
+\caption{Comparison of Python GPU-based and Rust-based inference containers}
+\end{table*}
+
+\noindent
+The Python-based container provides flexibility and rapid experimentation using the PyTorch ecosystem, but at the cost of larger image size and dependency complexity. In contrast, the Rust-based container offers a lightweight, production-ready solution with faster startup time and minimal runtime dependencies, making it more suitable for deployment scenarios.
+
+
+\subsection{Model Size Comparison}
+ 
+\begin{table*}[t!]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Model} & \textbf{Rust (.mpk/.bin)} & \textbf{Python (.pt/.pth)} \\
+\hline
+MNIST & 1.1 MB & 2 MB \\
+\hline
+Text Classification (AG News) & 21 MB & 40.6 MB \\
+\hline
+Regression & 4 KB & 6 MB \\
+\hline
+LSTM & 60 KB & 120 KB \\
+\hline
+\end{tabular}
+\caption{Comparison of model sizes between Rust and Python implementations}
+\end{table*}
+
+\noindent
+Rust-based serialized models are consistently smaller than their Python counterparts. This reduction is most significant in simpler models such as regression, and remains substantial for larger models like text classification. The smaller footprint of Rust models makes them more suitable for lightweight deployment and resource-constrained environments.
+
+\EOD
+\end{document}
