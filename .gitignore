@@ -39,3 +39,4 @@ python_ml/pytorch/regression/Training/artifacts/model_pytorch_regression
 
 # generated output files (data, models, artifacts)
 **/generated/
+python_ml/pytorch/text_classification_news/Inference/model_pytorch_text_classification/ag_news_model.pth
