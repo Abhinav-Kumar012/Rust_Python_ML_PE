@@ -1,41 +1,69 @@
-# misc
+# IDEs and Editors
 **/.vscode/
 **/.idea/
+**/.DS_Store
+*.swp
+*.swo
 
-# python
-**/.venv/
+# Python
 **/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/.ipynb_checkpoints/
+**/.venv/
+**/env/
+**/venv/
+*env/
 
-# rust
+# Rust
+**/target/
 **/Cargo.lock
-rust_ml/target/
 **/*.rs.bk
 
-# model
-rust_ml/model/
-model/
-python_ml/pytorch/text_classification_news/model_pytorch_text_classification/
+# Node.js
+**/node_modules/
+**/dist/
+**/build/
+**/out/
+.parcel-cache/
+.next/
 
-# mac files
-**/.DS_Store
+# Data and Datasets
+**/data/
+**/datasets/
+**/test_data/
+**/*.csv
+**/*.tsv
+**/*.parquet
+**/*.npy
+**/*.npz
+**/*.h5
+**/*.jsonl
+MNIST/
 
-# images folders
-data/benchmark_images
-python_ml/benchmark/test_data
+# ML Models and Weights
+**/*.pth
+**/*.pt
+**/*.ckpt
+**/*.onnx
+**/*.pb
+**/*.pkl
+**/*.joblib
+**/model/
+**/models/
+**/artifacts/
 
-# log files
+# Logs and Metrics
 **/*.log
-benchmark_logs
-
-#env
-textclassifyenv/
-
-MNIST
-
-model.pt
-
-python_ml/pytorch/text_classification_news/Training/model_pytorch_text_classification/ag_news_model.pth
-python_ml/pytorch/regression/Training/artifacts/model_pytorch_regression
-
-# generated output files (data, models, artifacts)
+**/logs/
+**/benchmark_logs/
+**/metrics.json
+**/results/
 **/generated/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
